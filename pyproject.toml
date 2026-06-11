@@ -1,0 +1,15 @@
+[project]
+name = "neetcode-offline"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.60",
+    "requests>=2.31",
+    "fsrs>=6.0",
+    "anthropic>=0.40",
+]
+
+[tool.uv]
+# Don't build/install this project — treat it as a script workspace.
+# uv will install dependencies then run scripts directly from the source tree.
+package = false
