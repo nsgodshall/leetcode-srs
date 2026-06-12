@@ -2,86 +2,94 @@
 One-time online preparation script.
 
 Usage:
-    python setup.py                  # fetch problem statements + reference solutions
-    python setup.py --editorials     # also scrape full NeetCode editorials (needs playwright)
-    python setup.py --explanations   # also download NeetCode video transcripts (needs yt-dlp)
-    python setup.py --videos         # also download all videos (large!)
-    python setup.py --all            # everything above
+    python prepare.py                  # fetch problem statements + reference solutions
+    python prepare.py --editorials     # also scrape full NeetCode editorials (needs playwright)
+    python prepare.py --explanations   # also download NeetCode video transcripts (needs yt-dlp)
+    python prepare.py --videos         # also download all videos (large!)
+    python prepare.py --all            # everything above
 """
 
+import asyncio
 import sys
-import subprocess
-import time
 from pathlib import Path
 
-# Ensure src/ is importable when run directly
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.problem_list import TOPICS, SLUG_IDS, LC_TO_NC_SLUG, all_slugs
+from src.problem_list import LC_TO_NC_SLUG, all_slugs
 from src import fetch as F
 from src import data as D
 
+_HTTP_CONCURRENCY = 8
+_PROC_CONCURRENCY = 5
 
-def fetch_problems() -> None:
+
+async def fetch_problems() -> None:
     slugs = all_slugs()
-    print(f"Fetching {len(slugs)} problems...")
     existing = D.load_problems()
-    total = len(slugs)
+    to_fetch = [s for s in slugs if s not in existing]
+    total = len(to_fetch)
 
-    for i, slug in enumerate(slugs, 1):
-        if slug in existing:
-            print(f"  [{i}/{total}] {slug} (cached)")
-            continue
-        print(f"  [{i}/{total}] {slug}", end="", flush=True)
-        data = F.fetch_problem(slug)
+    print(f"Fetching {total} problems ({len(slugs) - total} cached)...")
+    if not to_fetch:
+        return
+
+    sem = asyncio.Semaphore(_HTTP_CONCURRENCY)
+    done = 0
+
+    async def fetch_one(slug: str) -> None:
+        nonlocal done
+        async with sem:
+            data = await asyncio.to_thread(F.fetch_problem, slug)
+        done += 1
         if data:
             existing[slug] = data
-            print(f"  ✓ {data.get('title', slug)}")
+            print(f"  [{done}/{total}] ✓ {data.get('title', slug)}")
         else:
-            print(f"  ✗ failed")
-        if i < total:
-            time.sleep(0.6)
+            print(f"  [{done}/{total}] ✗ {slug}")
 
+    await asyncio.gather(*[fetch_one(s) for s in to_fetch])
     D.save_problems(existing)
     print(f"\nSaved {len(existing)} problems to data/problems.json")
 
 
-def fetch_solutions() -> None:
+async def fetch_solutions() -> None:
+    from src.data import _SOLUTIONS_DIR
+
     problems = D.load_problems()
-    slugs = all_slugs()
-    total = len(slugs)
+    all_ = all_slugs()
+    to_fetch = [s for s in all_ if not (_SOLUTIONS_DIR / f"{s}.py").exists()]
+    total = len(to_fetch)
     saved = 0
+    done = 0
 
-    print(f"\nFetching reference solutions...")
-    for i, slug in enumerate(slugs, 1):
-        sol_path = D.attempt_path(slug).parent.parent / "solutions" / f"{slug}.py"
-        # Use data module path
-        from src.data import _SOLUTIONS_DIR
-        sol_file = _SOLUTIONS_DIR / f"{slug}.py"
-        if sol_file.exists():
-            print(f"  [{i}/{total}] {slug} (cached)")
-            continue
+    print(f"\nFetching {total} solutions ({len(all_) - total} cached)...")
+    if not to_fetch:
+        return
 
-        print(f"  [{i}/{total}] {slug}", end="", flush=True)
-        sol = F.fetch_solution(slug)
+    sem = asyncio.Semaphore(_HTTP_CONCURRENCY)
+
+    async def fetch_one(slug: str) -> None:
+        nonlocal done, saved
+        async with sem:
+            sol = await asyncio.to_thread(F.fetch_solution, slug)
+        done += 1
         if sol:
             D.save_solution(slug, sol)
             saved += 1
-            print(f"  ✓")
             prob = problems.get(slug, {})
             prob["has_solution"] = True
             problems[slug] = prob
+            print(f"  [{done}/{total}] ✓ {slug}")
         else:
-            print(f"  – (not found)")
-        if i < total:
-            time.sleep(0.3)
+            print(f"  [{done}/{total}] – {slug} (not found)")
 
+    await asyncio.gather(*[fetch_one(s) for s in to_fetch])
     D.save_problems(problems)
     print(f"Saved {saved} solutions")
 
 
 def fetch_editorials() -> None:
-    """Scrape structured NeetCode editorials (prerequisites, approaches, pitfalls) via Playwright."""
+    """Scrape NeetCode editorials via Playwright (sequential — single browser page)."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -123,73 +131,86 @@ def fetch_editorials() -> None:
     print(f"\nSaved {saved} editorials to data/editorials/")
 
 
-def fetch_explanations() -> None:
-    """Download NeetCode YouTube transcripts for all problems."""
+async def fetch_explanations() -> None:
+    """Download NeetCode YouTube transcripts concurrently."""
     ytdlp = F._find_ytdlp()
     if not ytdlp:
         print("  ERROR: yt-dlp not found. Install: uv pip install yt-dlp")
         return
 
     problems = D.load_problems()
-    slugs = all_slugs()
-    total = len(slugs)
+    all_ = all_slugs()
+    to_fetch = [s for s in all_ if not D.explanation_path(s).exists()]
+    total = len(to_fetch)
     saved = 0
+    done = 0
 
-    print(f"\nFetching NeetCode transcripts for {total} problems...")
-    print("(each takes ~5 seconds — total ~12 min)\n")
+    print(f"\nFetching {total} transcripts ({len(all_) - total} cached)...")
+    if not to_fetch:
+        return
 
-    for i, slug in enumerate(slugs, 1):
-        if D.explanation_path(slug).exists():
-            print(f"  [{i}/{total}] {slug} (cached)")
-            continue
+    sem = asyncio.Semaphore(_PROC_CONCURRENCY)
 
+    async def fetch_one(slug: str) -> None:
+        nonlocal done, saved
         title = problems.get(slug, {}).get("title", slug)
-        print(f"  [{i}/{total}] {title}...", end="", flush=True)
-        text = F.fetch_transcript(slug, title)
+        async with sem:
+            text = await asyncio.to_thread(F.fetch_transcript, slug, title)
+        done += 1
         if text:
             D.save_explanation(slug, text)
             saved += 1
-            print(f" ✓ ({len(text)} chars)")
+            print(f"  [{done}/{total}] ✓ {title} ({len(text)} chars)")
         else:
-            print(" – (not found)")
+            print(f"  [{done}/{total}] – {title} (not found)")
 
+    await asyncio.gather(*[fetch_one(s) for s in to_fetch])
     print(f"\nSaved {saved} transcripts to data/explanations/")
 
 
-def download_all_videos() -> None:
+async def download_all_videos() -> None:
     problems = D.load_problems()
-    slugs = all_slugs()
-    print(f"\nDownloading videos for {len(slugs)} problems (this will take a long time!)...")
+    all_ = all_slugs()
+    to_fetch = [s for s in all_ if not D.video_path(s).exists()]
+    total = len(to_fetch)
+    done = 0
 
-    for i, slug in enumerate(slugs, 1):
-        vpath = D.video_path(slug)
-        if vpath.exists():
-            print(f"  [{i}/{len(slugs)}] {slug} (exists)")
-            continue
+    print(f"\nDownloading {total} videos (this will take a long time!)...")
+    if not to_fetch:
+        return
 
+    sem = asyncio.Semaphore(3)
+
+    async def download_one(slug: str) -> None:
+        nonlocal done
         title = problems.get(slug, {}).get("title", slug)
+        vpath = D.video_path(slug)
         out_tmpl = str(vpath).replace(".mp4", ".%(ext)s")
-        query = f"ytsearch1:NeetCode {title}"
         cmd = [
-            "yt-dlp", query,
+            "yt-dlp", f"ytsearch1:NeetCode {title}",
             "-f", "bestvideo[height<=480]+bestaudio/best[height<=480]",
             "--merge-output-format", "mp4",
             "-o", out_tmpl,
-            "--no-playlist",
-            "-q",
+            "--no-playlist", "-q",
         ]
-        print(f"  [{i}/{len(slugs)}] {title}...", end="", flush=True)
-        try:
-            result = subprocess.run(cmd, timeout=120)
-            print(" ✓" if result.returncode == 0 else " ✗")
-        except FileNotFoundError:
-            print("\nERROR: yt-dlp not found. Install it: pip install yt-dlp")
-            sys.exit(1)
-        except subprocess.TimeoutExpired:
-            print(" timed out")
+        async with sem:
+            try:
+                proc = await asyncio.create_subprocess_exec(*cmd)
+                await asyncio.wait_for(proc.wait(), timeout=120)
+                done += 1
+                print(f"  [{done}/{total}] {'✓' if proc.returncode == 0 else '✗'} {title}")
+            except asyncio.TimeoutError:
+                proc.kill()
+                done += 1
+                print(f"  [{done}/{total}] timed out: {title}")
+            except FileNotFoundError:
+                print("\nERROR: yt-dlp not found. Install it: pip install yt-dlp")
+                sys.exit(1)
+
+    await asyncio.gather(*[download_one(s) for s in to_fetch])
 
 
-if __name__ == "__main__":
+async def main() -> None:
     args = set(sys.argv[1:])
     do_videos = "--videos" in args or "--all" in args
     do_explanations = "--explanations" in args or "--all" in args
@@ -202,16 +223,21 @@ if __name__ == "__main__":
             print("Aborted.")
             sys.exit(0)
 
-    fetch_problems()
-    fetch_solutions()
+    await fetch_problems()
+    await fetch_solutions()
 
     if do_editorials:
-        fetch_editorials()
+        # Run in a thread so Playwright's sync API isn't inside the event loop
+        await asyncio.to_thread(fetch_editorials)
 
     if do_explanations:
-        fetch_explanations()
+        await fetch_explanations()
 
     if do_videos:
-        download_all_videos()
+        await download_all_videos()
 
     print("\nSetup complete!")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
