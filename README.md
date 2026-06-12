@@ -14,7 +14,7 @@ uv pip install -e .
 uv pip install yt-dlp   # optional, only needed for video downloads
 
 # 3. Fetch problem data while online (takes ~2 min)
-python setup.py
+python prepare.py
 
 # 4. Launch the TUI
 python run.py
@@ -81,7 +81,7 @@ Videos are **never downloaded automatically**. Two ways to get them:
 
 **Bulk (before your flight):**
 ```bash
-python setup.py --videos   # downloads all 150 at 480p (~10–15 GB)
+python prepare.py --videos   # downloads all 150 at 480p (~10–15 GB)
 ```
 
 **On-demand (from the TUI):**
@@ -98,7 +98,7 @@ back to `vlc`, `xdg-open`, `open`).
 neetcode-offline/
 ├── pyproject.toml
 ├── README.md
-├── setup.py          # online prep
+├── prepare.py        # online prep
 ├── run.py            # TUI entrypoint
 ├── src/
 │   ├── problem_list.py   # NeetCode 150 slugs
