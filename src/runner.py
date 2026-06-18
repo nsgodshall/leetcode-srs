@@ -294,9 +294,9 @@ def run_tests(slug: str, user_code: str) -> str:
     script = (
         _RUNNER_TEMPLATE
         .replace("<<<HELPERS>>>", _HELPERS)
-        .replace("<<<USER_CODE>>>", user_code)
         .replace("<<<TESTS_JSON_REPR>>>", repr(tests_json))
         .replace("<<<USER_CODE_LINE>>>", str(user_code_line))
+        .replace("<<<USER_CODE>>>", user_code)
     )
 
     with tempfile.NamedTemporaryFile(
