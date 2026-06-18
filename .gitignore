@@ -3,4 +3,12 @@
 __pycache__/
 *.pyc
 .venv/
-data/
+data/attempts
+data/editorials
+data/explanations
+data/solutions
+data/srs_backups
+data/videos
+data/problems.json
+data/progress.json
+data/srs.json.bak
