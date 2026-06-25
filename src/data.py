@@ -7,7 +7,6 @@ from typing import Any
 
 _BASE = Path(__file__).parent.parent / "data"
 _PROBLEMS_FILE = _BASE / "problems.json"
-_PROGRESS_FILE = _BASE / "progress.json"
 _SRS_FILE = _BASE / "srs.json"
 _SOLUTIONS_DIR = _BASE / "solutions"
 _VIDEOS_DIR = _BASE / "videos"
@@ -35,7 +34,7 @@ _problems_cache: dict[str, Any] | None = None
 def load_problems() -> dict[str, Any]:
     """Return the problems dict keyed by slug.
 
-    problems.json is static at runtime (only setup.py writes it), so the parsed
+    problems.json is static at runtime (only prepare.py writes it), so the parsed
     result is cached in-process to avoid re-parsing the ~240 KB file on every
     list refresh and problem-screen render.
     """
@@ -54,29 +53,6 @@ def save_problems(problems: dict[str, Any]) -> None:
         json.dumps(problems, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     _problems_cache = problems
-
-
-# ── Progress ──────────────────────────────────────────────────────────────
-
-def load_progress() -> dict[str, bool]:
-    if not _PROGRESS_FILE.exists():
-        return {}
-    return json.loads(_PROGRESS_FILE.read_text(encoding="utf-8"))
-
-
-def _save_progress(progress: dict[str, bool]) -> None:
-    _PROGRESS_FILE.write_text(
-        json.dumps(progress, indent=2), encoding="utf-8"
-    )
-
-
-def toggle_solved(slug: str) -> bool:
-    """Toggle the solved state for *slug* and return the new state."""
-    progress = load_progress()
-    new_state = not progress.get(slug, False)
-    progress[slug] = new_state
-    _save_progress(progress)
-    return new_state
 
 
 # ── Reference solutions ───────────────────────────────────────────────────
@@ -236,17 +212,6 @@ def record_review(slug: str, rating_int: int) -> Any:
     srs[slug] = _card_to_dict(updated)
     _save_srs(srs)
     return updated
-
-
-def due_slugs() -> list[str]:
-    """Return slugs that have been reviewed before and are now due."""
-    now = datetime.now(timezone.utc)
-    return [
-        slug for slug, d in load_srs().items()
-        if not slug.startswith("_")
-        and d.get("last_review") is not None
-        and datetime.fromisoformat(d["due"]) <= now
-    ]
 
 
 def all_srs_cards() -> list[tuple[str, dict]]:

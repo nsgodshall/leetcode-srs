@@ -509,7 +509,7 @@ class ProblemScreen(Screen):
             header += f"[dim]Next review: {due_label} · {state_name}[/dim]\n"
         header += "\n"
 
-        content = escape(prob.get("content_text", "(Run python setup.py to fetch problem data)"))
+        content = escape(prob.get("content_text", "(Run python prepare.py to fetch problem data)"))
         hints_count = len(prob.get("hints") or [])
         footer = (
             f"\n\n[dim]hints: {hints_count}  |  "
@@ -572,8 +572,8 @@ class ProblemScreen(Screen):
         if not best_text and not sol:
             pane.update(
                 "[yellow]Nothing cached yet.\n\n"
-                "Run [bold]python setup.py[/bold] for code,\n"
-                "or [bold]python setup.py --editorials[/bold] for full editorials.[/yellow]"
+                "Run [bold]python prepare.py[/bold] for code,\n"
+                "or [bold]python prepare.py --editorials[/bold] for full editorials.[/yellow]"
             )
             return
 
