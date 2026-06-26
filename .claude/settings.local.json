@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv pip:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(PYTHONPATH=/home/nick/Programs/neetcode .venv/bin/python:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(uv run:*)",
+      "Bash(PYTHONPATH=. .venv/bin/python:*)",
+      "WebFetch(domain:neetcode.io)",
+      "Bash(curl:*)",
+      "Bash(/usr/bin/curl:*)",
+      "Bash(echo $content:*)",
+      "Bash(python3:*)",
+      "Bash(PYTHONPATH=.:*)",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(ls:*)",
+      "Bash(/home/nick/Programs/neetcode/.venv/bin/playwright install:*)",
+      "Bash(PYTHONPATH=/home/nick/Programs/neetcode /home/nick/Programs/neetcode/.venv/bin/python:*)",
+      "Bash(grep '\": \\\\[$')",
+      "Bash(git *)"
+    ]
+  }
+}
