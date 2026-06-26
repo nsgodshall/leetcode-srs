@@ -10,19 +10,25 @@ from src.tui import NeetCodeApp
 
 
 def _load_env() -> None:
-    """Load key=value pairs from .env.local if it exists."""
-    env_file = Path(__file__).parent / ".env.local"
-    if not env_file.exists():
-        return
-    for line in env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+    """Load key=value pairs from .env then .env.local (latter wins).
+
+    A real value already in the process environment always takes precedence over
+    both files.
+    """
+    root = Path(__file__).parent
+    for name in (".env", ".env.local"):
+        env_file = root / name
+        if not env_file.exists():
             continue
-        key, _, value = line.partition("=")
-        key = key.strip()
-        value = value.strip()
-        if key and key not in os.environ:
-            os.environ[key] = value
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and not os.environ.get(key):
+                os.environ[key] = value
 
 
 def main() -> None:
