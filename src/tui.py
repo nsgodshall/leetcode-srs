@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -201,11 +202,9 @@ class ListScreen(Screen):
     async def on_mount(self) -> None:
         await self._refresh_list()
 
-    def _build_items(self) -> list[ListItem]:
+    def _build_items(self, srs: dict, due_set: set) -> list[ListItem]:
         problems = D.load_problems()
-        srs = D.load_srs()
         reviewed_set = {s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")}
-        due_set = set(D.due_slugs())
         ft = self._filter_text.lower()
         ft_topic = self._filter_topic
         items: list[ListItem] = []
@@ -227,10 +226,9 @@ class ListScreen(Screen):
             items.extend(topic_items)
         return items
 
-    def _refresh_header(self) -> None:
-        srs = D.load_srs()
+    def _refresh_header(self, srs: dict, due_set: set) -> None:
         reviewed_total = sum(1 for s, d in srs.items() if not s.startswith("_") and d.get("last_review"))
-        due_count = len(D.due_slugs())
+        due_count = len(due_set)
         due_str = f"  [yellow]Due: {due_count}[/yellow]" if due_count else ""
         self.query_one("#list-header", Static).update(
             f"Reviewed: {reviewed_total}/{len(all_slugs())}{due_str}  |  / search  |  t topic  |  x srs  |  Esc clear"
@@ -239,10 +237,17 @@ class ListScreen(Screen):
     async def _refresh_list(self) -> None:
         """Full rebuild: clear and remount every visible row. Use only when the
         visible set changes (initial load, filter change)."""
-        self._refresh_header()
+        srs = D.load_srs()
+        now = datetime.now(timezone.utc)
+        due_set = {
+            slug for slug, d in srs.items()
+            if not slug.startswith("_") and d.get("last_review")
+            and datetime.fromisoformat(d["due"]) <= now
+        }
+        self._refresh_header(srs, due_set)
         lv = self.query_one("#problem-list", ListView)
         await lv.clear()
-        new_items = self._build_items()
+        new_items = self._build_items(srs, due_set)
         if new_items:
             await lv.mount(*new_items)
         self._rendered_sig = (self._filter_text, self._filter_topic)
@@ -250,10 +255,15 @@ class ListScreen(Screen):
     def _refresh_indicators(self) -> None:
         """Cheap path: update the ↻/✓ indicator on already-mounted rows in place,
         without clearing or remounting. Used when returning to an unchanged list."""
-        self._refresh_header()
         srs = D.load_srs()
+        now = datetime.now(timezone.utc)
+        due_set = {
+            slug for slug, d in srs.items()
+            if not slug.startswith("_") and d.get("last_review")
+            and datetime.fromisoformat(d["due"]) <= now
+        }
+        self._refresh_header(srs, due_set)
         reviewed_set = {s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")}
-        due_set = set(D.due_slugs())
         for row in self.query(ProblemRow):
             row.set_state(row.slug in reviewed_set, row.slug in due_set)
 
@@ -486,7 +496,6 @@ class ProblemScreen(Screen):
         # SRS status line
         srs_data = D.load_srs().get(self._slug)
         if srs_data and srs_data.get("last_review"):
-            from datetime import datetime, timezone
             from fsrs import State
             due = datetime.fromisoformat(srs_data["due"])
             now = datetime.now(timezone.utc)
@@ -500,7 +509,7 @@ class ProblemScreen(Screen):
             header += f"[dim]Next review: {due_label} · {state_name}[/dim]\n"
         header += "\n"
 
-        content = escape(prob.get("content_text", "(Run python setup.py to fetch problem data)"))
+        content = escape(prob.get("content_text", "(Run python prepare.py to fetch problem data)"))
         hints_count = len(prob.get("hints") or [])
         footer = (
             f"\n\n[dim]hints: {hints_count}  |  "
@@ -563,8 +572,8 @@ class ProblemScreen(Screen):
         if not best_text and not sol:
             pane.update(
                 "[yellow]Nothing cached yet.\n\n"
-                "Run [bold]python setup.py[/bold] for code,\n"
-                "or [bold]python setup.py --editorials[/bold] for full editorials.[/yellow]"
+                "Run [bold]python prepare.py[/bold] for code,\n"
+                "or [bold]python prepare.py --editorials[/bold] for full editorials.[/yellow]"
             )
             return
 
@@ -648,7 +657,6 @@ class ProblemScreen(Screen):
                 return
             card = D.record_review(self._slug, rating)
             from fsrs import State
-            from datetime import datetime, timezone
             state_name = State(card.state).name
             due = card.due
             now = datetime.now(timezone.utc)
@@ -776,12 +784,12 @@ class ProblemScreen(Screen):
             while i < len(lines):
                 if lines[i].startswith("    "):
                     _flush_prose()
-                    code: list[str] = []
+                    code_lines: list[str] = []
                     while i < len(lines) and lines[i].startswith("    "):
-                        code.append(lines[i][4:])
+                        code_lines.append(lines[i][4:])
                         i += 1
                     segments.append(Syntax(
-                        "\n".join(code), "python",
+                        "\n".join(code_lines), "python",
                         theme="monokai", background_color="default",
                         word_wrap=True,
                     ))
@@ -893,13 +901,14 @@ class ProblemScreen(Screen):
 
 def _due_label(due_iso: str, now_utc: Any) -> str:
     """Return a colour-tagged relative due label."""
-    from datetime import datetime, timezone
     due = datetime.fromisoformat(due_iso)
     delta = due - now_utc
+    if delta.total_seconds() < 0:
+        overdue_days = int(abs(delta.total_seconds()) // 86400)
+        if overdue_days == 0:
+            return "[red]overdue today[/red]"
+        return f"[red]overdue {overdue_days}d[/red]"
     days = delta.days
-    if days < 0:
-        n = abs(days)
-        return f"[red]overdue {n}d[/red]"
     if days == 0:
         return "[yellow]today[/yellow]"
     if days < 7:
@@ -909,7 +918,6 @@ def _due_label(due_iso: str, now_utc: Any) -> str:
 
 
 def _last_review_label(lr_iso: str, now_utc: Any) -> str:
-    from datetime import datetime
     lr = datetime.fromisoformat(lr_iso)
     delta = now_utc - lr
     days = delta.days
@@ -920,7 +928,6 @@ def _last_review_label(lr_iso: str, now_utc: Any) -> str:
 
 class SRSRow(Static):
     def __init__(self, slug: str, card: dict[str, Any], prob: dict[str, Any]) -> None:
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         due_iso = card.get("due", "")
         is_due = due_iso and datetime.fromisoformat(due_iso) <= now
@@ -981,11 +988,10 @@ class SRSScreen(Screen):
 
     def action_jump_bottom(self) -> None:
         lv = self.query_one("#srs-list", ListView)
-        if lv._nodes:
-            lv.index = len(lv._nodes) - 1
+        if len(lv):
+            lv.index = len(lv) - 1
 
     async def _refresh(self) -> None:
-        from datetime import datetime, timezone
         now = datetime.now(timezone.utc)
         cards = D.all_srs_cards()
         problems = D.load_problems()
@@ -997,8 +1003,7 @@ class SRSScreen(Screen):
         )
         due_week = sum(
             1 for _, d in cards
-            if d.get("due") and (datetime.fromisoformat(d["due"]) - now).days <= 7
-            and datetime.fromisoformat(d["due"]) > now
+            if d.get("due") and 0 < (datetime.fromisoformat(d["due"]) - now).days <= 7
         )
 
         if cards:
@@ -1055,7 +1060,6 @@ class SRSScreen(Screen):
             slug = self._highlighted_slug()
             if slug:
                 event.stop()
-                from datetime import datetime, timezone
                 card = D.load_srs().get(slug, {})
                 due_iso = card.get("due", "")
                 if due_iso and datetime.fromisoformat(due_iso) <= datetime.now(timezone.utc):

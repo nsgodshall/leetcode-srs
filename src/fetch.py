@@ -378,7 +378,7 @@ def _scrape_editorial_page(page: Any, nc_slug: str, first: bool = False) -> str 
 def fetch_editorial(nc_slug: str) -> str | None:
     """
     Scrape a single NeetCode editorial using a fresh Playwright browser.
-    For bulk fetching, setup.py calls fetch_editorials_bulk() to reuse one browser.
+    For bulk fetching, prepare.py calls fetch_editorials() to reuse one browser.
     Returns None if playwright is not installed or the page fails to load.
     """
     try:

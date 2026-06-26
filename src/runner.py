@@ -132,6 +132,8 @@ _RUNNER_TEMPLATE = textwrap.dedent("""
                 return sorted(str(x) for x in got) == sorted(str(x) for x in exp)
         if mode == "sorted_lists":
             return sorted(str(x) for x in got) == sorted(str(x) for x in exp)
+        if mode == "set_of_tuples":
+            return set(tuple(sorted(x)) for x in got) == set(tuple(sorted(x)) for x in exp)
         if mode == "sorted_groups":
             sg = lambda g: sorted([sorted(row) for row in g])
             return sg(got) == sg(exp)
@@ -294,9 +296,9 @@ def run_tests(slug: str, user_code: str) -> str:
     script = (
         _RUNNER_TEMPLATE
         .replace("<<<HELPERS>>>", _HELPERS)
-        .replace("<<<USER_CODE>>>", user_code)
         .replace("<<<TESTS_JSON_REPR>>>", repr(tests_json))
         .replace("<<<USER_CODE_LINE>>>", str(user_code_line))
+        .replace("<<<USER_CODE>>>", user_code)
     )
 
     with tempfile.NamedTemporaryFile(
