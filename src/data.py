@@ -162,7 +162,12 @@ def editorial_path(slug: str) -> Path:
 
 def load_editorial(slug: str) -> str | None:
     p = editorial_path(slug)
-    return p.read_text(encoding="utf-8") if p.exists() else None
+    if p.exists():
+        return p.read_text(encoding="utf-8")
+    # SQL problems ship a bundled, AI-generated editorial (no scraped NeetCode
+    # editorial exists for them).
+    from src.sql_tests import SQL_PROBLEMS
+    return SQL_PROBLEMS.get(slug, {}).get("editorial")
 
 
 def save_editorial(slug: str, text: str) -> None:

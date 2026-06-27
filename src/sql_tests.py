@@ -72,6 +72,128 @@ INSERT INTO Person (id, email) VALUES
 """
 
 
+# All SQL editorials are AI-generated (see banner). They are written for this
+# offline pilot because there is no scraped NeetCode editorial for SQL problems.
+_AI_BANNER = (
+    "⚠  AI-GENERATED EDITORIAL\n"
+    "This explanation was written by an AI model (Claude), not the official\n"
+    "LeetCode/NeetCode editorial. It may contain mistakes — verify the logic\n"
+    "and run the tests before trusting it.\n"
+    "────────────────────────────────────────\n\n"
+)
+
+_COMBINE_TWO_TABLES_EDITORIAL = _AI_BANNER + """\
+Goal: report firstName, lastName, city, and state for every person — even those
+who have no matching row in Address.
+
+Approach — LEFT JOIN
+The key requirement is "every person must appear, with null for a missing
+address." An INNER JOIN would silently drop people without an address (in the
+sample data, Allen has no Address row and would vanish). A LEFT JOIN keeps every
+row from the left table (Person) and fills the Address columns with NULL when
+there is no match.
+
+```sql
+SELECT p.firstName, p.lastName, a.city, a.state
+FROM Person p
+LEFT JOIN Address a ON p.personId = a.personId;
+```
+
+Why it works
+- LEFT JOIN preserves all Person rows; unmatched ones get NULL city/state.
+- We join on personId, the foreign key linking the two tables.
+- No ORDER BY is needed — the prompt allows any order.
+
+Common mistake
+Using a plain JOIN (= INNER JOIN). It passes only if every person happens to
+have an address, then fails the moment one doesn't.
+
+Complexity: one pass over Person with a lookup into Address — O(n + m) with an
+index on Address.personId.
+"""
+
+_SECOND_HIGHEST_SALARY_EDITORIAL = _AI_BANNER + """\
+Goal: return the second highest DISTINCT salary, or NULL when it doesn't exist
+(e.g. only one employee, or everyone earns the same).
+
+The tricky part is the "doesn't exist" case. The query must return a single row
+containing NULL rather than returning zero rows.
+
+Approach — DISTINCT + ORDER BY + LIMIT/OFFSET, wrapped in a scalar subquery
+Sort the distinct salaries high to low, then skip the top one and take the next:
+
+```sql
+SELECT (
+    SELECT DISTINCT salary
+    FROM Employee
+    ORDER BY salary DESC
+    LIMIT 1 OFFSET 1
+) AS SecondHighestSalary;
+```
+
+Why it works
+- DISTINCT collapses ties so "200, 200, 100" still has a real second value.
+- ORDER BY salary DESC puts the highest first; OFFSET 1 skips it; LIMIT 1 takes
+  the runner-up.
+- The inner query returns no rows when there's no second salary. Wrapping it as
+  a SELECT (...) scalar subquery turns "no rows" into a single NULL row — which
+  is exactly what the problem asks for.
+
+Watch the output column name
+The grader expects the column to be named SecondHighestSalary, so the AS alias
+is required, not cosmetic.
+
+Alternative
+
+```sql
+SELECT MAX(salary) AS SecondHighestSalary
+FROM Employee
+WHERE salary < (SELECT MAX(salary) FROM Employee);
+```
+
+MAX over an empty set also yields NULL, so this handles the edge case too.
+
+Complexity: O(n log n) for the sort (or O(n) for the MAX-based version).
+"""
+
+_DUPLICATE_EMAILS_EDITORIAL = _AI_BANNER + """\
+Goal: report every email address that appears more than once.
+
+Approach — GROUP BY + HAVING
+Group the rows by email so each distinct address becomes one group, then keep
+only the groups whose row count exceeds one.
+
+```sql
+SELECT email AS Email
+FROM Person
+GROUP BY email
+HAVING COUNT(*) > 1;
+```
+
+Why it works
+- GROUP BY email buckets identical addresses together.
+- COUNT(*) is the size of each bucket.
+- HAVING filters on that aggregate (WHERE can't — it runs before grouping).
+
+Remember: WHERE vs HAVING
+WHERE filters individual rows before aggregation; HAVING filters groups after
+aggregation. Counting duplicates is inherently a post-aggregation condition, so
+it must live in HAVING.
+
+Alternative (self-join)
+
+```sql
+SELECT DISTINCT a.email AS Email
+FROM Person a
+JOIN Person b ON a.email = b.email AND a.id <> b.id;
+```
+
+Readable but typically slower than GROUP BY on large tables.
+
+Complexity: O(n) with a hash-based grouping.
+"""
+
+
 SQL_PROBLEMS: dict[str, dict] = {
     "combine-two-tables": {
         "id": 175,
@@ -103,6 +225,7 @@ SQL_PROBLEMS: dict[str, dict] = {
             "FROM Person p\n"
             "LEFT JOIN Address a ON p.personId = a.personId;"
         ),
+        "editorial": _COMBINE_TWO_TABLES_EDITORIAL,
     },
     "second-highest-salary": {
         "id": 176,
@@ -135,6 +258,7 @@ SQL_PROBLEMS: dict[str, dict] = {
             "    LIMIT 1 OFFSET 1\n"
             ") AS SecondHighestSalary;"
         ),
+        "editorial": _SECOND_HIGHEST_SALARY_EDITORIAL,
     },
     "duplicate-emails": {
         "id": 182,
@@ -163,6 +287,7 @@ SQL_PROBLEMS: dict[str, dict] = {
             "GROUP BY email\n"
             "HAVING COUNT(*) > 1;"
         ),
+        "editorial": _DUPLICATE_EMAILS_EDITORIAL,
     },
 }
 

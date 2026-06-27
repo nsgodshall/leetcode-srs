@@ -364,8 +364,12 @@ class ListScreen(Screen):
 
 # ── Helpers ───────────────────────────────────────────────────────────────
 
-def _render_editorial(label: str, text: str, sol: str | None):
-    """Split editorial text on ```python fences, highlight code, append solution."""
+def _render_editorial(label: str, text: str, sol: str | None, sol_lang: str = "python"):
+    """Split editorial text on fenced code blocks, highlight code, append solution.
+
+    Opening fences may name a language (```python, ```sql); the trailing
+    reference solution is highlighted as *sol_lang*.
+    """
     from rich.syntax import Syntax
     from rich.text import Text
     from rich.console import Group
@@ -374,17 +378,20 @@ def _render_editorial(label: str, text: str, sol: str | None):
     current: list[str] = []
     in_code = False
     code: list[str] = []
+    code_lang = "python"
 
     for line in text.split("\n"):
-        if line.strip() == "```python":
+        stripped = line.strip()
+        if not in_code and stripped.startswith("```"):
             if current:
                 parts.append(Text("\n".join(current) + "\n"))
                 current = []
             in_code = True
             code = []
-        elif line.strip() == "```" and in_code:
+            code_lang = stripped[3:].strip() or "text"
+        elif in_code and stripped == "```":
             if code:
-                parts.append(Syntax("\n".join(code), "python", theme="monokai", line_numbers=True))
+                parts.append(Syntax("\n".join(code), code_lang, theme="monokai", line_numbers=True))
                 parts.append(Text("\n"))
             in_code = False
             code = []
@@ -396,11 +403,11 @@ def _render_editorial(label: str, text: str, sol: str | None):
     if current:
         parts.append(Text("\n".join(current)))
     if in_code and code:
-        parts.append(Syntax("\n".join(code), "python", theme="monokai", line_numbers=True))
+        parts.append(Syntax("\n".join(code), code_lang, theme="monokai", line_numbers=True))
 
     if sol:
         parts.append(Text("\n" + "─" * 40 + "\n", style="dim"))
-        parts.append(Syntax(sol, "python", theme="monokai", line_numbers=True))
+        parts.append(Syntax(sol, sol_lang, theme="monokai", line_numbers=True))
 
     return Group(*parts)
 
@@ -577,13 +584,19 @@ class ProblemScreen(Screen):
             )
             return
 
+        is_sql = D.load_problems().get(self._slug, {}).get("lang") == "sql"
+        sol_lang = "sql" if is_sql else "python"
+
         if best_text:
-            label = "── NeetCode Editorial ──" if editorial else "── NeetCode Explanation ──"
-            pane.update(_render_editorial(label, best_text, sol))
+            if editorial:
+                label = "── AI-Generated Editorial ──" if is_sql else "── NeetCode Editorial ──"
+            else:
+                label = "── NeetCode Explanation ──"
+            pane.update(_render_editorial(label, best_text, sol, sol_lang))
         else:
             from rich.syntax import Syntax
             from rich.console import Group
-            pane.update(Group(Syntax(sol, "python", theme="monokai", line_numbers=True)))
+            pane.update(Group(Syntax(sol, sol_lang, theme="monokai", line_numbers=True)))
 
     def action_hints(self) -> None:
         problems = D.load_problems()
