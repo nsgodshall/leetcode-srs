@@ -280,7 +280,14 @@ _RUNNER_TEMPLATE = textwrap.dedent("""
 
 
 def run_tests(slug: str, user_code: str) -> str:
-    """Run HAND_TESTS for *slug*. Returns combined stdout+stderr as a string."""
+    """Run tests for *slug*. Dispatches SQL problems to the SQLite runner;
+    otherwise runs HAND_TESTS against the user's Python Solution in a subprocess.
+    Returns the printable report as a string."""
+    from src.sql_tests import is_sql_slug
+    if is_sql_slug(slug):
+        from src.sql_runner import run_sql_tests
+        return run_sql_tests(slug, user_code)
+
     tests: list[dict[str, Any]] = HAND_TESTS.get(slug, [])
     tests_json = json.dumps(tests)
 

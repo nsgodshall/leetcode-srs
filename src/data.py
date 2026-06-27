@@ -44,6 +44,12 @@ def load_problems() -> dict[str, Any]:
             _problems_cache = json.loads(_PROBLEMS_FILE.read_text(encoding="utf-8"))
         else:
             _problems_cache = {}
+        # SQL problems are bundled (offline pilot), not fetched by prepare.py.
+        # Merge them in so they appear in the list without a network step; an
+        # entry already in problems.json wins (setdefault).
+        from src.sql_tests import SQL_PROBLEMS
+        for slug, prob in SQL_PROBLEMS.items():
+            _problems_cache.setdefault(slug, prob)
     return _problems_cache
 
 
@@ -58,6 +64,9 @@ def save_problems(problems: dict[str, Any]) -> None:
 # ── Reference solutions ───────────────────────────────────────────────────
 
 def reference_solution(slug: str) -> str | None:
+    prob = load_problems().get(slug, {})
+    if prob.get("lang") == "sql":
+        return prob.get("reference")
     path = _SOLUTIONS_DIR / f"{slug}.py"
     return path.read_text(encoding="utf-8") if path.exists() else None
 
@@ -69,7 +78,8 @@ def save_solution(slug: str, code: str) -> None:
 # ── Attempts ──────────────────────────────────────────────────────────────
 
 def attempt_path(slug: str) -> Path:
-    return _ATTEMPTS_DIR / f"{slug}.py"
+    ext = "sql" if load_problems().get(slug, {}).get("lang") == "sql" else "py"
+    return _ATTEMPTS_DIR / f"{slug}.{ext}"
 
 
 def load_attempt(slug: str) -> str | None:
@@ -86,6 +96,10 @@ def starter_code(slug: str, problems: dict[str, Any]) -> str:
     prob = problems.get(slug, {})
     title = prob.get("title", slug)
     difficulty = prob.get("difficulty", "")
+
+    if prob.get("lang") == "sql":
+        return _sql_starter_code(slug, prob)
+
     snippet = prob.get("python_snippet", "")
     content = prob.get("content_text", "").strip()
 
@@ -100,6 +114,29 @@ def starter_code(slug: str, problems: dict[str, Any]) -> str:
         body = "class Solution:\n    def solve(self):\n        # Your code here\n        pass\n"
 
     return header + typing_import + body
+
+
+def _sql_starter_code(slug: str, prob: dict[str, Any]) -> str:
+    """Return a .sql starter: problem statement + schema as comments, then stub."""
+    title = prob.get("title", slug)
+    difficulty = prob.get("difficulty", "")
+    content = prob.get("content_text", "").strip()
+    schema = prob.get("sql_schema", "").strip()
+    snippet = prob.get("sql_snippet", "-- Write your SQL query statement below")
+
+    def comment(text: str) -> str:
+        return "\n".join(f"-- {line}".rstrip() for line in text.splitlines())
+
+    parts = [
+        comment(f"{title}  [{difficulty}]"),
+        comment(f"https://leetcode.com/problems/{slug}/"),
+        "--",
+        comment(content),
+    ]
+    if schema:
+        parts += ["--", comment("Schema:"), comment(schema)]
+    parts += ["", snippet, ""]
+    return "\n".join(parts)
 
 
 # ── Explanations (YouTube transcript) ────────────────────────────────────

@@ -187,10 +187,23 @@ TOPICS: dict[str, list[str]] = {
         "sum-of-two-integers",
         "reverse-integer",
     ],
+    # SQL is an offline pilot: these problems are bundled in src/sql_tests.py
+    # (statement + schema + expected results) rather than fetched by prepare.py.
+    "SQL": [
+        "combine-two-tables",
+        "second-highest-salary",
+        "duplicate-emails",
+    ],
 }
+
+# Slugs in TOPICS that are SQL problems (not part of the NeetCode 150 Python set).
+SQL_SLUGS: set[str] = set(TOPICS["SQL"])
 
 # LeetCode problem IDs for building reference solution URLs
 SLUG_IDS: dict[str, int] = {
+    "combine-two-tables": 175,
+    "second-highest-salary": 176,
+    "duplicate-emails": 182,
     "contains-duplicate": 217,
     "valid-anagram": 242,
     "two-sum": 1,
@@ -509,14 +522,21 @@ def all_slugs() -> list[str]:
     return [s for slugs in TOPICS.values() for s in slugs]
 
 
+def python_slugs() -> list[str]:
+    """NeetCode (Python) slugs only — SQL problems are bundled offline and must
+    not be fetched from LeetCode by prepare.py."""
+    return [s for s in all_slugs() if s not in SQL_SLUGS]
+
+
 def topic_for(slug: str) -> str | None:
     return _SLUG_TO_TOPIC.get(slug)
 
 
 if __name__ == "__main__":
     slugs = all_slugs()
-    print(f"Total problems: {len(slugs)}")
-    assert len(slugs) == 150, f"Expected 150, got {len(slugs)}"
+    neetcode = [s for s in slugs if s not in SQL_SLUGS]
+    print(f"Total problems: {len(slugs)} ({len(neetcode)} NeetCode + {len(SQL_SLUGS)} SQL)")
+    assert len(neetcode) == 150, f"Expected 150 NeetCode problems, got {len(neetcode)}"
     # check for duplicates
     assert len(set(slugs)) == len(slugs), "Duplicate slugs found!"
     print("All checks passed.")
