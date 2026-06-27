@@ -55,7 +55,7 @@ the editor.
 | `e` | Edit your solution (opens `$EDITOR`) |
 | `r` | Run tests (hand-curated pass/fail where available) |
 | `a` | Rate your recall (feeds the SRS scheduler) |
-| `c` | AI critique of your attempt (needs `ANTHROPIC_API_KEY`) |
+| `c` | AI critique of your attempt (needs `ANTHROPIC_API_KEY` or `DEEPSEEK_API_KEY`) |
 | `s` | Show editorial / reference solution (syntax-highlighted) |
 | `v` | Play video / download on demand |
 | `?` | Show hints |
@@ -107,9 +107,9 @@ card's state, next due date, and stability.
 
 ### AI Critique (optional)
 
-Press `c` on a problem to get a critique of your attempt. Set
-`ANTHROPIC_API_KEY` (in your shell or `.env.local`); without it the feature
-stays offline.
+Press `c` on a problem to get a critique of your attempt. Set either
+`ANTHROPIC_API_KEY` or `DEEPSEEK_API_KEY` (in your shell or `.env.local`);
+without one the feature stays offline. Anthropic takes priority when both are set.
 
 ## Video Downloads
 
