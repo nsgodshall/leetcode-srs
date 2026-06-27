@@ -32,6 +32,7 @@ from src.runner import run_tests
 def _slugify(s: str) -> str:
     """Make a string safe for a Textual widget ID."""
     import re
+
     s = s.replace("&", "and")
     s = re.sub(r"[^a-zA-Z0-9_-]", "_", s)
     s = re.sub(r"_+", "_", s).strip("_")
@@ -44,6 +45,7 @@ DIFF_COLOR = {"Easy": "green", "Medium": "yellow", "Hard": "red"}
 
 
 # ── Modal screens ─────────────────────────────────────────────────────────
+
 
 class SearchModal(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "dismiss(None)", "Cancel")]
@@ -145,6 +147,7 @@ class RatingModal(ModalScreen[int]):
 
 # ── List screen ───────────────────────────────────────────────────────────
 
+
 class ProblemRow(Static):
     def __init__(self, prob: dict[str, Any], solved: bool, due: bool = False) -> None:
         self.slug = prob["slug"]
@@ -204,7 +207,9 @@ class ListScreen(Screen):
 
     def _build_items(self, srs: dict, due_set: set) -> list[ListItem]:
         problems = D.load_problems()
-        reviewed_set = {s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")}
+        reviewed_set = {
+            s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")
+        }
         ft = self._filter_text.lower()
         ft_topic = self._filter_topic
         items: list[ListItem] = []
@@ -213,21 +218,32 @@ class ListScreen(Screen):
                 continue
             topic_items: list[ListItem] = []
             for slug in slugs:
-                prob = problems.get(slug, {"slug": slug, "id": 0, "title": slug, "difficulty": ""})
+                prob = problems.get(
+                    slug, {"slug": slug, "id": 0, "title": slug, "difficulty": ""}
+                )
                 title = prob.get("title", slug)
                 if ft and ft not in title.lower() and ft not in slug:
                     continue
                 reviewed = slug in reviewed_set
                 due = slug in due_set
-                topic_items.append(ListItem(ProblemRow(prob, reviewed, due), id=f"p-{slug}"))
+                topic_items.append(
+                    ListItem(ProblemRow(prob, reviewed, due), id=f"p-{slug}")
+                )
             if not topic_items:
                 continue
-            items.append(ListItem(Label(f"[bold cyan]── {topic} ──[/bold cyan]"), id=f"h-{_slugify(topic)}"))
+            items.append(
+                ListItem(
+                    Label(f"[bold cyan]── {topic} ──[/bold cyan]"),
+                    id=f"h-{_slugify(topic)}",
+                )
+            )
             items.extend(topic_items)
         return items
 
     def _refresh_header(self, srs: dict, due_set: set) -> None:
-        reviewed_total = sum(1 for s, d in srs.items() if not s.startswith("_") and d.get("last_review"))
+        reviewed_total = sum(
+            1 for s, d in srs.items() if not s.startswith("_") and d.get("last_review")
+        )
         due_count = len(due_set)
         due_str = f"  [yellow]Due: {due_count}[/yellow]" if due_count else ""
         self.query_one("#list-header", Static).update(
@@ -240,8 +256,10 @@ class ListScreen(Screen):
         srs = D.load_srs()
         now = datetime.now(timezone.utc)
         due_set = {
-            slug for slug, d in srs.items()
-            if not slug.startswith("_") and d.get("last_review")
+            slug
+            for slug, d in srs.items()
+            if not slug.startswith("_")
+            and d.get("last_review")
             and datetime.fromisoformat(d["due"]) <= now
         }
         self._refresh_header(srs, due_set)
@@ -258,12 +276,16 @@ class ListScreen(Screen):
         srs = D.load_srs()
         now = datetime.now(timezone.utc)
         due_set = {
-            slug for slug, d in srs.items()
-            if not slug.startswith("_") and d.get("last_review")
+            slug
+            for slug, d in srs.items()
+            if not slug.startswith("_")
+            and d.get("last_review")
             and datetime.fromisoformat(d["due"]) <= now
         }
         self._refresh_header(srs, due_set)
-        reviewed_set = {s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")}
+        reviewed_set = {
+            s for s, d in srs.items() if not s.startswith("_") and d.get("last_review")
+        }
         for row in self.query(ProblemRow):
             row.set_state(row.slug in reviewed_set, row.slug in due_set)
 
@@ -298,12 +320,14 @@ class ListScreen(Screen):
         def _apply(q: str | None) -> None:
             self._filter_text = q or ""
             # on_screen_resume will refresh
+
         self.app.push_screen(SearchModal(), _apply)
 
     def action_topic_filter(self) -> None:
         def _apply(t: str | None) -> None:
             self._filter_topic = t
             # on_screen_resume will refresh
+
         self.app.push_screen(TopicModal(), _apply)
 
     async def action_clear_filters(self) -> None:
@@ -330,19 +354,27 @@ class ListScreen(Screen):
             return
         problems = D.load_problems()
         title = problems.get(slug, {}).get("title", slug)
+
         def _on_confirm(yes: bool) -> None:
             if yes:
                 self._download_video(slug, title)
-        self.app.push_screen(ConfirmModal(f"Download video for {title}? (~30 MB)"), _on_confirm)
+
+        self.app.push_screen(
+            ConfirmModal(f"Download video for {title}? (~30 MB)"), _on_confirm
+        )
 
     @work(thread=True)
     def _download_video(self, slug: str, title: str) -> None:
         out_tmpl = str(D.video_path(slug)).replace(".mp4", ".%(ext)s")
         cmd = [
-            "yt-dlp", f"ytsearch1:NeetCode {title}",
-            "-f", "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "--merge-output-format", "mp4",
-            "-o", out_tmpl,
+            "yt-dlp",
+            f"ytsearch1:NeetCode {title}",
+            "-f",
+            "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "--merge-output-format",
+            "mp4",
+            "-o",
+            out_tmpl,
             "--no-playlist",
         ]
         self.app.call_from_thread(self.app.notify, f"Downloading: {title}…")
@@ -352,23 +384,28 @@ class ListScreen(Screen):
                 self.app.call_from_thread(self.app.notify, "Download complete!")
             else:
                 self.app.call_from_thread(
-                    self.app.notify, f"Download failed: {result.stderr[:200]}", severity="error"
+                    self.app.notify,
+                    f"Download failed: {result.stderr[:200]}",
+                    severity="error",
                 )
         except FileNotFoundError:
             self.app.call_from_thread(
                 self.app.notify, "yt-dlp not found. Install it first.", severity="error"
             )
         except subprocess.TimeoutExpired:
-            self.app.call_from_thread(self.app.notify, "Download timed out.", severity="error")
+            self.app.call_from_thread(
+                self.app.notify, "Download timed out.", severity="error"
+            )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
 
+
 def _render_editorial(label: str, text: str, sol: str | None):
     """Split editorial text on ```python fences, highlight code, append solution."""
+    from rich.console import Group
     from rich.syntax import Syntax
     from rich.text import Text
-    from rich.console import Group
 
     parts = [Text(f"{label}\n\n", style="bold cyan")]
     current: list[str] = []
@@ -384,7 +421,11 @@ def _render_editorial(label: str, text: str, sol: str | None):
             code = []
         elif line.strip() == "```" and in_code:
             if code:
-                parts.append(Syntax("\n".join(code), "python", theme="monokai", line_numbers=True))
+                parts.append(
+                    Syntax(
+                        "\n".join(code), "python", theme="monokai", line_numbers=True
+                    )
+                )
                 parts.append(Text("\n"))
             in_code = False
             code = []
@@ -396,7 +437,9 @@ def _render_editorial(label: str, text: str, sol: str | None):
     if current:
         parts.append(Text("\n".join(current)))
     if in_code and code:
-        parts.append(Syntax("\n".join(code), "python", theme="monokai", line_numbers=True))
+        parts.append(
+            Syntax("\n".join(code), "python", theme="monokai", line_numbers=True)
+        )
 
     if sol:
         parts.append(Text("\n" + "─" * 40 + "\n", style="dim"))
@@ -430,9 +473,15 @@ def _format_run_output(result: str):
         elif idx == 0 and set(stripped) <= {".", "F", "E", "?"} and stripped:
             # the pass/fail bar: color each glyph
             for ch in line:
-                out.append(ch, style={
-                    ".": "green", "F": "red", "E": "red", "?": "yellow",
-                }.get(ch, "white"))
+                out.append(
+                    ch,
+                    style={
+                        ".": "green",
+                        "F": "red",
+                        "E": "red",
+                        "?": "yellow",
+                    }.get(ch, "white"),
+                )
             out.append(suffix)
         else:
             out.append(line + suffix, style="dim")
@@ -440,6 +489,7 @@ def _format_run_output(result: str):
 
 
 # ── Problem screen ────────────────────────────────────────────────────────
+
 
 class ProblemScreen(Screen):
     BINDINGS = [
@@ -483,6 +533,7 @@ class ProblemScreen(Screen):
 
     def _render_problem(self) -> None:
         from rich.markup import escape
+
         problems = D.load_problems()
         prob = problems.get(self._slug, {})
 
@@ -497,6 +548,7 @@ class ProblemScreen(Screen):
         srs_data = D.load_srs().get(self._slug)
         if srs_data and srs_data.get("last_review"):
             from fsrs import State
+
             due = datetime.fromisoformat(srs_data["due"])
             now = datetime.now(timezone.utc)
             state_name = State(srs_data["state"]).name
@@ -509,7 +561,9 @@ class ProblemScreen(Screen):
             header += f"[dim]Next review: {due_label} · {state_name}[/dim]\n"
         header += "\n"
 
-        content = escape(prob.get("content_text", "(Run python prepare.py to fetch problem data)"))
+        content = escape(
+            prob.get("content_text", "(Run python prepare.py to fetch problem data)")
+        )
         hints_count = len(prob.get("hints") or [])
         footer = (
             f"\n\n[dim]hints: {hints_count}  |  "
@@ -546,11 +600,14 @@ class ProblemScreen(Screen):
     @work(thread=True)
     def _do_run(self, code: str) -> None:
         import re
+
         result = run_tests(self._slug, code)
         # Render as a literal Text (no markup parsing): runner output is plain
         # text containing brackets like "inputs=[1,2]  expected=-1", which the
         # default markup renderer would try to parse as tags and crash on.
-        display = _format_run_output(result) if result.strip() else "[dim]No output[/dim]"
+        display = (
+            _format_run_output(result) if result.strip() else "[dim]No output[/dim]"
+        )
         self.app.call_from_thread(
             self.query_one("#output-pane", Static).update,
             display,
@@ -578,22 +635,34 @@ class ProblemScreen(Screen):
             return
 
         if best_text:
-            label = "── NeetCode Editorial ──" if editorial else "── NeetCode Explanation ──"
+            label = (
+                "── NeetCode Editorial ──"
+                if editorial
+                else "── NeetCode Explanation ──"
+            )
             pane.update(_render_editorial(label, best_text, sol))
         else:
-            from rich.syntax import Syntax
             from rich.console import Group
-            pane.update(Group(Syntax(sol, "python", theme="monokai", line_numbers=True)))
+            from rich.syntax import Syntax
+
+            pane.update(
+                Group(Syntax(sol, "python", theme="monokai", line_numbers=True))
+            )
 
     def action_hints(self) -> None:
         problems = D.load_problems()
         prob = problems.get(self._slug, {})
         hints = prob.get("hints") or []
         if not hints:
-            self.query_one("#output-pane", Static).update("[dim]No hints available.[/dim]")
+            self.query_one("#output-pane", Static).update(
+                "[dim]No hints available.[/dim]"
+            )
             return
         from rich.markup import escape
-        text = "\n\n".join(f"[bold]Hint {i+1}:[/bold] {escape(h)}" for i, h in enumerate(hints))
+
+        text = "\n\n".join(
+            f"[bold]Hint {i + 1}:[/bold] {escape(h)}" for i, h in enumerate(hints)
+        )
         self.query_one("#output-pane", Static).update(text)
 
     def _active_scroll(self) -> VerticalScroll:
@@ -657,6 +726,7 @@ class ProblemScreen(Screen):
                 return
             card = D.record_review(self._slug, rating)
             from fsrs import State
+
             state_name = State(card.state).name
             due = card.due
             now = datetime.now(timezone.utc)
@@ -669,15 +739,21 @@ class ProblemScreen(Screen):
             else:
                 due_str = f"in {days}d"
             label_map = {1: "Again", 2: "Hard", 3: "Good", 4: "Easy"}
-            self.app.notify(f"{label_map[rating]} → next review {due_str} ({state_name})")
+            self.app.notify(
+                f"{label_map[rating]} → next review {due_str} ({state_name})"
+            )
             self._render_problem()
+
         self.app.push_screen(RatingModal(), _on_rating)
 
     def action_critique(self) -> None:
         import os
-        if not os.environ.get("ANTHROPIC_API_KEY"):
+
+        has_anthropic = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        has_deepseek = bool(os.environ.get("DEEPSEEK_API_KEY"))
+        if not has_anthropic and not has_deepseek:
             self.query_one("#output-pane", Static).update(
-                "[green]ANTHROPIC_API_KEY not set. System offline.[/green]"
+                "[green]ANTHROPIC_API_KEY or DEEPSEEK_API_KEY not set. System offline.[/green]"
             )
             return
         code = D.load_attempt(self._slug)
@@ -711,7 +787,9 @@ class ProblemScreen(Screen):
 
     @work(thread=True)
     def _do_critique(self, code: str, prob: dict) -> None:
-        import anthropic, time
+        import os
+        import time
+
         title = prob.get("title", self._slug)
         difficulty = prob.get("difficulty", "Unknown")
         ref = D.reference_solution(self._slug)
@@ -753,15 +831,23 @@ class ProblemScreen(Screen):
             f"SUBMITTED CODE:\n```python\n{code}\n```"
         )
         if ref:
-            user_msg += f"\n\nOPTIMAL SOLUTION [INTERNAL REFERENCE]:\n```python\n{ref}\n```"
+            user_msg += (
+                f"\n\nOPTIMAL SOLUTION [INTERNAL REFERENCE]:\n```python\n{ref}\n```"
+            )
 
-        from rich.markup import escape as _esc
         from rich.console import Group
-        from rich.text import Text
+        from rich.markup import escape as _esc
         from rich.syntax import Syntax
+        from rich.text import Text
+
+        # ---- choose provider ----
+        use_deepseek = bool(os.environ.get("DEEPSEEK_API_KEY")) and not bool(
+            os.environ.get("ANTHROPIC_API_KEY")
+        )
 
         _HEADER = (
             "┌─ EVALUATION SYSTEM v2.0 ─────────────────┐\n"
+            f"│  PROVIDER: {'DeepSeek' if use_deepseek else 'Anthropic':<28} │\n"
             f"│  PROBLEM: {title[:30]:<30} │\n"
             f"│  DIFFICULTY: {difficulty:<28} │\n"
             "└──────────────────────────────────────────┘\n"
@@ -788,11 +874,15 @@ class ProblemScreen(Screen):
                     while i < len(lines) and lines[i].startswith("    "):
                         code_lines.append(lines[i][4:])
                         i += 1
-                    segments.append(Syntax(
-                        "\n".join(code_lines), "python",
-                        theme="monokai", background_color="default",
-                        word_wrap=True,
-                    ))
+                    segments.append(
+                        Syntax(
+                            "\n".join(code_lines),
+                            "python",
+                            theme="monokai",
+                            background_color="default",
+                            word_wrap=True,
+                        )
+                    )
                 else:
                     prose.append(lines[i])
                     i += 1
@@ -805,17 +895,13 @@ class ProblemScreen(Screen):
                     segments.append(Text("█", style="green"))
             return Group(*segments)
 
-        client = anthropic.Anthropic()
         pane = self.query_one("#output-pane", Static)
+
         try:
-            # Collect full response first (Haiku is fast, <2s latency)
-            with client.messages.stream(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=900,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_msg}],
-            ) as stream:
-                full_response = stream.get_final_message().content[0].text
+            if use_deepseek:
+                full_response = self._call_deepseek(system_prompt, user_msg)
+            else:
+                full_response = self._call_anthropic(system_prompt, user_msg)
 
             # Response in hand — stop the "ANALYZING…" ellipsis animation.
             self.app.call_from_thread(self._stop_analyze_timer)
@@ -836,14 +922,48 @@ class ProblemScreen(Screen):
                 f"[red]SYSTEM ERROR: {_esc(str(e))}[/red]",
             )
 
+    def _call_anthropic(self, system_prompt: str, user_msg: str) -> str:
+        import anthropic
+
+        client = anthropic.Anthropic()
+        with client.messages.stream(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=900,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_msg}],
+        ) as stream:
+            return stream.get_final_message().content[0].text
+
+    def _call_deepseek(self, system_prompt: str, user_msg: str) -> str:
+        import os
+
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=os.environ["DEEPSEEK_API_KEY"],
+            base_url="https://api.deepseek.com",
+        )
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            max_tokens=900,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+            stream=False,
+        )
+        return response.choices[0].message.content or ""
+
     def action_video(self) -> None:
         vpath = D.video_path(self._slug)
         if vpath.exists():
             self._launch_video(vpath)
         else:
+
             def _on_confirm(yes: bool) -> None:
                 if yes:
                     self._download_video()
+
             self.app.push_screen(
                 ConfirmModal("Download video (~30 MB)? [y/n]"), _on_confirm
             )
@@ -872,9 +992,12 @@ class ProblemScreen(Screen):
         cmd = [
             "yt-dlp",
             query,
-            "-f", "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "--merge-output-format", "mp4",
-            "-o", out_tmpl,
+            "-f",
+            "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "--merge-output-format",
+            "mp4",
+            "-o",
+            out_tmpl,
             "--no-playlist",
         ]
         self.app.call_from_thread(self.app.notify, f"Downloading: {title}…")
@@ -898,6 +1021,7 @@ class ProblemScreen(Screen):
 
 
 # ── SRS management screen ────────────────────────────────────────────────
+
 
 def _due_label(due_iso: str, now_utc: Any) -> str:
     """Return a colour-tagged relative due label."""
@@ -942,6 +1066,7 @@ class SRSRow(Static):
         state_val = card.get("state", 1)
         try:
             from fsrs import State
+
             state_name = State(state_val).name
         except Exception:
             state_name = str(state_val)
@@ -998,11 +1123,13 @@ class SRSScreen(Screen):
         retention = D.get_retention()
 
         due_now = sum(
-            1 for _, d in cards
+            1
+            for _, d in cards
             if d.get("due") and datetime.fromisoformat(d["due"]) <= now
         )
         due_week = sum(
-            1 for _, d in cards
+            1
+            for _, d in cards
             if d.get("due") and 0 < (datetime.fromisoformat(d["due"]) - now).days <= 7
         )
 
@@ -1023,7 +1150,9 @@ class SRSScreen(Screen):
         if cards:
             items = []
             for slug, card in cards:
-                prob = problems.get(slug, {"slug": slug, "title": slug, "difficulty": ""})
+                prob = problems.get(
+                    slug, {"slug": slug, "title": slug, "difficulty": ""}
+                )
                 items.append(ListItem(SRSRow(slug, card, prob), id=f"srs-{slug}"))
             await lv.mount(*items)
             lv.index = 0
@@ -1062,9 +1191,13 @@ class SRSScreen(Screen):
                 event.stop()
                 card = D.load_srs().get(slug, {})
                 due_iso = card.get("due", "")
-                if due_iso and datetime.fromisoformat(due_iso) <= datetime.now(timezone.utc):
+                if due_iso and datetime.fromisoformat(due_iso) <= datetime.now(
+                    timezone.utc
+                ):
                     D.attempt_path(slug).unlink(missing_ok=True)
-                    self.app.notify("Solution wiped — solve it fresh.", severity="warning")
+                    self.app.notify(
+                        "Solution wiped — solve it fresh.", severity="warning"
+                    )
                 self.app.push_screen(ProblemScreen(slug))
 
     def action_reset_card(self) -> None:
@@ -1073,12 +1206,19 @@ class SRSScreen(Screen):
             return
         problems = D.load_problems()
         title = problems.get(slug, {}).get("title", slug)
+
         def _on_confirm(yes: bool) -> None:
             if yes:
                 D.reset_card(slug)
                 self.app.notify(f"Reset: {title}")
                 self.app.call_later(self._refresh)
-        self.app.push_screen(ConfirmModal(f"Reset '{title}'?\nRemoves all SRS history for this problem."), _on_confirm)
+
+        self.app.push_screen(
+            ConfirmModal(
+                f"Reset '{title}'?\nRemoves all SRS history for this problem."
+            ),
+            _on_confirm,
+        )
 
     async def action_decrease_retention(self) -> None:
         D.set_retention(D.get_retention() - 0.05)
