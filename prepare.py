@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.problem_list import LC_TO_NC_SLUG, all_slugs
+from src.problem_list import LC_TO_NC_SLUG, python_slugs
 from src import fetch as F
 from src import data as D
 
@@ -24,7 +24,7 @@ _PROC_CONCURRENCY = 5
 
 
 async def fetch_problems() -> None:
-    slugs = all_slugs()
+    slugs = python_slugs()
     existing = D.load_problems()
     to_fetch = [s for s in slugs if s not in existing]
     total = len(to_fetch)
@@ -56,7 +56,7 @@ async def fetch_solutions() -> None:
     from src.data import _SOLUTIONS_DIR
 
     problems = D.load_problems()
-    all_ = all_slugs()
+    all_ = python_slugs()
     to_fetch = [s for s in all_ if not (_SOLUTIONS_DIR / f"{s}.py").exists()]
     total = len(to_fetch)
     saved = 0
@@ -97,7 +97,7 @@ def fetch_editorials() -> None:
         print("  Run: uv pip install playwright && .venv/bin/playwright install chromium")
         return
 
-    slugs = all_slugs()
+    slugs = python_slugs()
     to_fetch = [s for s in slugs if not D.editorial_path(s).exists()]
     cached = len(slugs) - len(to_fetch)
     saved = 0
@@ -139,7 +139,7 @@ async def fetch_explanations() -> None:
         return
 
     problems = D.load_problems()
-    all_ = all_slugs()
+    all_ = python_slugs()
     to_fetch = [s for s in all_ if not D.explanation_path(s).exists()]
     total = len(to_fetch)
     saved = 0
@@ -170,7 +170,7 @@ async def fetch_explanations() -> None:
 
 async def download_all_videos() -> None:
     problems = D.load_problems()
-    all_ = all_slugs()
+    all_ = python_slugs()
     to_fetch = [s for s in all_ if not D.video_path(s).exists()]
     total = len(to_fetch)
     done = 0
