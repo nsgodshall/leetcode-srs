@@ -1,0 +1,104 @@
+Reimplement Python's built-in zip().
+
+Signature for reference:
+
+    def zip(*iterables, strict=False):
+        """
+        Make an iterator that aggregates elements from each of the iterables.
+
+        Returns an iterator of tuples, where the i-th tuple contains the i-th
+        element from each of the argument sequences or iterables. The iterator
+        stops when the shortest input iterable is exhausted.
+
+        If strict is true and one of the arguments is exhausted before the
+        others, raise a ValueError.
+
+        >>> list(zip('ABCD', 'xy'))
+        [('A', 'x'), ('B', 'y')]
+        >>> list(zip(range(3), range(5), range(2)))
+        [(0, 0, 0), (1, 1, 1)]
+        """
+
+Approach
+--------
+zip is fundamentally about iterators, not indexing. You cannot index the
+arguments (they may be generators, files, or any one-shot iterable with no
+len), so:
+
+1. Turn every argument into an iterator with `iter()`.
+2. Repeatedly call `next()` once on each iterator to assemble one tuple.
+3. The moment *any* iterator is exhausted, stop — that is the "shortest
+   input" rule.
+4. Because it returns an iterator and produces values lazily, write it as a
+   generator (use `yield`).
+
+Edge cases that separate a good answer from a sloppy one
+--------------------------------------------------------
+- Zero arguments: `zip()` yields nothing — handle the empty case so you
+  don't loop forever or crash.
+- A single argument: `zip([1,2,3])` yields `(1,), (2,), (3,)` — tuples of
+  length 1.
+- Laziness: don't materialize the inputs into lists; that breaks on
+  infinite or streaming iterables and wastes memory.
+- `strict=True` (Python 3.10+): every input must be the *same* length. If
+  one runs out while others still have items, raise ValueError rather than
+  silently truncating. This catches "I assumed these were parallel arrays"
+  bugs.
+
+Implementing strict correctly
+-----------------------------
+When an iterator raises StopIteration, you must distinguish two cases:
+- It was the *first* iterator in this round to stop → others might also be
+  done; that's a clean end only if every remaining one is also exhausted.
+- It stopped *after* some siblings already produced a value this round →
+  lengths differ → ValueError.
+
+A clean way: track how many values you've collected this round. If the
+first iterator (index 0) stops, confirm the rest are also exhausted; if a
+later iterator stops mid-round, that's a length mismatch.
+
+```python
+def my_zip(*iterables, strict=False):
+    if not iterables:
+        return
+    iterators = [iter(it) for it in iterables]
+    while True:
+        result = []
+        for i, it in enumerate(iterators):
+            try:
+                result.append(next(it))
+            except StopIteration:
+                if not strict:
+                    return
+                # strict: a clean stop is only valid if iterator 0 stopped
+                # and every other iterator is also exhausted.
+                if i == 0:
+                    for j, other in enumerate(iterators[1:], start=1):
+                        try:
+                            next(other)
+                        except StopIteration:
+                            continue
+                        raise ValueError(
+                            f"my_zip() argument {j + 1} is longer than argument 1"
+                        )
+                    return
+                raise ValueError(
+                    f"my_zip() argument {i + 1} is shorter than argument 1"
+                )
+        yield tuple(result)
+```
+
+Complexity
+----------
+Time O(total elements consumed); space O(number of iterables) for the one
+tuple in flight — independent of how long the iterables are. That constant
+extra space is the whole point of returning an iterator instead of a list.
+
+Quick checks
+------------
+    list(my_zip('ABCD', 'xy'))            -> [('A','x'), ('B','y')]
+    list(my_zip(range(3), range(5), range(2))) -> [(0,0,0), (1,1,1)]
+    list(my_zip())                        -> []
+    list(my_zip([1,2,3]))                 -> [(1,), (2,), (3,)]
+    list(my_zip([1,2], [3,4], strict=True)) -> [(1,3), (2,4)]
+    list(my_zip([1,2,3], [4,5], strict=True)) -> ValueError

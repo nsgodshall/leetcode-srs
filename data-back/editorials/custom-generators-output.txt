@@ -1,0 +1,67 @@
+What does this code print?
+
+    def generate_odd_numbers():
+        n = 1
+        while True:
+            yield n
+            n += 2
+
+    print(generate_odd_numbers())
+
+Answer: it prints something like
+
+    <generator object generate_odd_numbers at 0x10a3f2c10>
+
+NOT 1, and NOT an infinite loop.
+
+Why
+---
+Any function whose body contains a `yield` is a *generator function*.
+Calling it does not run a single line of the body. Instead it immediately
+returns a *generator object* — a paused, lazy iterator. The `while True`
+loop only advances when something asks the generator for its next value.
+
+So `print(generate_odd_numbers())` calls the function (getting a generator
+object back) and prints the object's `repr`, which is the `<generator ...>`
+line above. The body never executes, which is also why the infinite
+`while True` does not hang the program.
+
+How to actually get values out
+------------------------------
+You drive a generator with `next()` or by iterating it. Because this one is
+infinite, you must bound how much you pull — never do `list(gen)` or
+`for x in gen:` without a break, or you *will* hang.
+
+```python
+gen = generate_odd_numbers()
+print(next(gen))   # 1
+print(next(gen))   # 3
+print(next(gen))   # 5
+
+# Take the first 5 lazily, without building an infinite list:
+from itertools import islice
+print(list(islice(generate_odd_numbers(), 5)))   # [1, 3, 5, 7, 9]
+```
+
+Key points an interviewer is listening for
+-------------------------------------------
+1. Calling a generator function returns a generator; the body is deferred.
+2. Generators are *lazy* — values are produced one at a time, on demand.
+3. They hold constant memory regardless of how many values they can yield,
+   which is exactly why infinite sequences are representable.
+4. State (here, `n`) is preserved between `yield`s; execution resumes right
+   after the `yield` each time you call `next()`.
+5. A generator is single-pass — once exhausted it cannot be rewound.
+
+Common follow-ups
+-----------------
+- "How would you print the first N odd numbers?"  → `itertools.islice`.
+- "Difference between a generator and a list comprehension?"  → `[...]`
+  is eager and materializes everything; `(...)` is a lazy generator
+  expression.
+- "What does `print(generate_odd_numbers())` print if you add `return n`
+  after the loop?"  → unreachable; still prints the generator object.
+- "When does `StopIteration` get raised?"  → when the function returns;
+  this one never returns, so it never stops on its own.
+
+The reference file below shows the safe ways to consume it.

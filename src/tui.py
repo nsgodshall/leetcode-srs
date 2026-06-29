@@ -25,7 +25,7 @@ from textual.widgets import (
 )
 
 from src import data as D
-from src.problem_list import TOPICS, all_slugs
+from src.problem_list import DISPLAY_TOPICS, display_slugs
 from src.runner import run_tests
 
 
@@ -69,7 +69,7 @@ class TopicModal(ModalScreen[str | None]):
 
     def compose(self) -> ComposeResult:
         items = [ListItem(Label("(all topics)"), id="topic-all")]
-        for topic in TOPICS:
+        for topic in DISPLAY_TOPICS:
             items.append(ListItem(Label(topic), id=f"topic-{_slugify(topic)}"))
         with Vertical(id="topic-box"):
             yield Label("Filter by topic:")
@@ -217,7 +217,7 @@ class ListScreen(Screen):
         ft = self._filter_text.lower()
         ft_topic = self._filter_topic
         items: list[ListItem] = []
-        for topic, slugs in TOPICS.items():
+        for topic, slugs in DISPLAY_TOPICS.items():
             if ft_topic and topic != ft_topic:
                 continue
             topic_items: list[ListItem] = []
@@ -251,7 +251,7 @@ class ListScreen(Screen):
         due_count = len(due_set)
         due_str = f"  [yellow]Due: {due_count}[/yellow]" if due_count else ""
         self.query_one("#list-header", Static).update(
-            f"Reviewed: {reviewed_total}/{len(all_slugs())}{due_str}  |  / search  |  t topic  |  x srs  |  Esc clear"
+            f"Reviewed: {reviewed_total}/{len(display_slugs())}{due_str}  |  / search  |  t topic  |  x srs  |  Esc clear"
         )
 
     async def _refresh_list(self) -> None:
