@@ -1,0 +1,119 @@
+Design: download many files concurrently from a list of URLs.
+
+Task
+----
+1. Open a text file with an arbitrary number of URLs, one per line, e.g.
+
+    www.domain1.com/doc1.pdf
+    www.domain1.com/doc2.pdf
+    www.domain2.com/doc1.html
+    www.domain3.com/doc1.txt
+
+2. Download all of those files concurrently.
+
+How to think about it
+---------------------
+Downloading is *I/O-bound*: each request spends almost all its time waiting
+on the network, not on the CPU. That means the GIL is not the bottleneck —
+threads (or async) give real speedups here, unlike CPU-bound work which
+needs processes. Two idiomatic options:
+
+- `concurrent.futures.ThreadPoolExecutor` + `requests` — simplest, blocking
+  code, a bounded pool of worker threads. Great default.
+- `asyncio` + `aiohttp` — scales to thousands of in-flight requests on one
+  thread; more moving parts. Reach for it when concurrency is very high.
+
+The reference below uses a thread pool because it reads like ordinary
+sequential code and is easy to reason about in an interview.
+
+Discussion points an interviewer wants to hear
+----------------------------------------------
+- Bounded concurrency: don't spawn one thread per URL for a million URLs.
+  A fixed-size pool (`max_workers`) caps open sockets and is polite to
+  servers. This is the single most important design point.
+- Filename collisions: `domain1.com/doc1.pdf` and `domain2.com/doc1.pdf`
+  both end in `doc1.pdf`. Derive the output name from the *full* URL (e.g.
+  include the host, or hash the URL) so downloads don't clobber each other.
+- Streaming to disk: use `stream=True` and write in chunks so a 2 GB file
+  doesn't have to fit in RAM.
+- Per-task error isolation: one dead link, timeout, or 404 must not kill the
+  whole batch. Catch per URL, record the failure, keep going.
+- Timeouts and retries: always set a timeout; transient failures (5xx,
+  connection reset) are worth a bounded retry with backoff.
+- Normalizing input: lines may have whitespace, blanks, or a missing
+  scheme (`www....` with no `http://`). Strip, skip blanks, prepend a
+  scheme if absent.
+- Verifying success: check `response.status_code` / `raise_for_status()`;
+  a 404 body written to disk is a "successful" download of an error page.
+- Idempotency / resume: optionally skip URLs whose output file already
+  exists so a re-run only fetches what's missing.
+
+Scaling further
+---------------
+- Politeness: rate-limit per host (a semaphore keyed by hostname) so you
+  don't hammer one server with 50 parallel requests.
+- Progress + observability: log each completion; for huge batches a
+  progress bar or periodic counter helps.
+- Memory: with streaming + a bounded pool, memory stays flat regardless of
+  how many URLs are in the file.
+
+```python
+import concurrent.futures as cf
+import hashlib
+from pathlib import Path
+from urllib.parse import urlparse
+import requests
+
+
+def read_urls(path):
+    for line in Path(path).read_text().splitlines():
+        url = line.strip()
+        if not url:
+            continue
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+        yield url
+
+
+def output_name(url, out_dir):
+    parsed = urlparse(url)
+    # Include host + a short hash of the full URL so files from different
+    # domains (or paths) never collide on the same basename.
+    stem = Path(parsed.path).name or "index"
+    digest = hashlib.sha1(url.encode()).hexdigest()[:8]
+    return Path(out_dir) / f"{parsed.netloc}_{digest}_{stem}"
+
+
+def download(url, out_dir, timeout=30):
+    dest = output_name(url, out_dir)
+    with requests.get(url, stream=True, timeout=timeout) as r:
+        r.raise_for_status()
+        with open(dest, "wb") as f:
+            for chunk in r.iter_content(chunk_size=64 * 1024):
+                f.write(chunk)
+    return dest
+
+
+def download_all(url_file, out_dir="downloads", max_workers=8):
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    urls = list(read_urls(url_file))
+    results = {}
+    with cf.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        future_to_url = {pool.submit(download, u, out_dir): u for u in urls}
+        for fut in cf.as_completed(future_to_url):
+            url = future_to_url[fut]
+            try:
+                results[url] = ("ok", str(fut.result()))
+            except Exception as e:           # isolate per-URL failures
+                results[url] = ("error", repr(e))
+    return results
+```
+
+Why ThreadPoolExecutor and not multiprocessing?
+-----------------------------------------------
+Processes pay a heavy cost to spawn and to ship data back, and they exist to
+sidestep the GIL for *CPU-bound* work. Here the work is waiting on sockets;
+threads release the GIL during blocking I/O, so a thread pool gets the
+concurrency benefit with far less overhead. If you later needed to also
+parse/transform large downloads on the CPU, you might hand that stage off to
+a process pool.

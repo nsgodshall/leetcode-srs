@@ -189,6 +189,24 @@ TOPICS: dict[str, list[str]] = {
     ],
 }
 
+# Custom interview-prep questions — NOT part of the NeetCode 150 and never
+# fetched online (prepare.py only iterates all_slugs(), which stays 150-only).
+# Their problem statements, editorials, and reference solutions are seeded in
+# data-back/ (problems.json, editorials/, solutions/). They show up as their
+# own section in the TUI via DISPLAY_TOPICS below.
+CUSTOM_TOPICS: dict[str, list[str]] = {
+    "Interview Prep (Custom)": [
+        "custom-generators-output",
+        "custom-implement-zip",
+        "custom-concurrent-downloads",
+        "custom-csv-data-wrangling",
+    ],
+}
+
+# What the TUI lists: the NeetCode 150 followed by the custom section.
+DISPLAY_TOPICS: dict[str, list[str]] = {**TOPICS, **CUSTOM_TOPICS}
+
+
 # LeetCode problem IDs for building reference solution URLs
 SLUG_IDS: dict[str, int] = {
     "contains-duplicate": 217,
@@ -497,16 +515,28 @@ LC_TO_NC_SLUG: dict[str, str] = {
     "reverse-integer": "reverse-integer",
 }
 
-# Build reverse map: slug -> topic
+# Build reverse map: slug -> topic (covers both the 150 and custom questions)
 _SLUG_TO_TOPIC: dict[str, str] = {
     slug: topic
-    for topic, slugs in TOPICS.items()
+    for topic, slugs in DISPLAY_TOPICS.items()
     for slug in slugs
 }
 
 
 def all_slugs() -> list[str]:
+    """The NeetCode 150 only. Used by prepare.py's online fetchers, so custom
+    questions (which are seeded locally, never fetched) are deliberately
+    excluded."""
     return [s for slugs in TOPICS.values() for s in slugs]
+
+
+def custom_slugs() -> list[str]:
+    return [s for slugs in CUSTOM_TOPICS.values() for s in slugs]
+
+
+def display_slugs() -> list[str]:
+    """Everything shown in the TUI: the 150 plus the custom section."""
+    return [s for slugs in DISPLAY_TOPICS.values() for s in slugs]
 
 
 def topic_for(slug: str) -> str | None:

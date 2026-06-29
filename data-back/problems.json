@@ -2595,5 +2595,91 @@
     ],
     "hints": [],
     "has_solution": false
+  },
+  "custom-generators-output": {
+    "id": 9001,
+    "title": "Generators: What Does This Print?",
+    "slug": "custom-generators-output",
+    "difficulty": "Easy",
+    "content_text": "Generators\n\nWhat does this code print?\n\n    def generate_odd_numbers():\n        n = 1\n        while True:\n            yield n\n            n += 2\n\n    print(generate_odd_numbers())\n\nBe precise: does it print 1? Does it loop forever? Then explain how you would print the first five odd numbers instead.\n\n(Press s for the editorial + reference.)",
+    "example_testcases": "",
+    "python_snippet": "# Predict the output of print(generate_odd_numbers()), then write\n# code that prints the first five odd numbers using the generator.\n\ndef generate_odd_numbers():\n    n = 1\n    while True:\n        yield n\n        n += 2\n",
+    "topic_tags": [
+      "Custom",
+      "Python",
+      "Generators",
+      "Iterators"
+    ],
+    "hints": [
+      "A function containing `yield` is a generator function — what does calling it actually return?",
+      "The body does not run until something pulls a value out. How do you pull values? (next / for / itertools.islice)",
+      "Never list() an infinite generator — bound it."
+    ],
+    "has_solution": true
+  },
+  "custom-implement-zip": {
+    "id": 9002,
+    "title": "Implement zip() From Scratch",
+    "slug": "custom-implement-zip",
+    "difficulty": "Medium",
+    "content_text": "Algorithms\n\nThis is the signature of the zip() built-in function:\n\n    def zip(*iterables, strict=False):\n        \"\"\"\n        Make an iterator that aggregates elements from each of the iterables.\n\n        Returns an iterator of tuples, where the i-th tuple contains the\n        i-th element from each of the argument sequences or iterables. The\n        iterator stops when the shortest input iterable is exhausted.\n\n        If strict is true and one of the arguments is exhausted before the\n        others, raise a ValueError.\n\n        >>> list(zip('ABCD', 'xy'))\n        [('A', 'x'), ('B', 'y')]\n        >>> list(zip(range(3), range(5), range(2)))\n        [(0, 0, 0), (1, 1, 1)]\n        \"\"\"\n\nGive a possible Python implementation of the function. Handle zero arguments, a single argument, lazy/infinite inputs, and strict=True.\n\n(Press s for the editorial + reference.)",
+    "example_testcases": "",
+    "python_snippet": "def my_zip(*iterables, strict=False):\n    # Drive every argument through iter(); assemble one tuple per round\n    # with next(); stop when the shortest is exhausted. Use yield.\n    pass\n",
+    "topic_tags": [
+      "Custom",
+      "Python",
+      "Iterators",
+      "Generators"
+    ],
+    "hints": [
+      "You can't index the inputs (they may be generators) — use iter() + next().",
+      "Stop the moment any iterator raises StopIteration (shortest-input rule).",
+      "Return an iterator: write it as a generator with yield.",
+      "strict=True: if one runs out mid-round while others still have items, raise ValueError."
+    ],
+    "has_solution": true
+  },
+  "custom-concurrent-downloads": {
+    "id": 9003,
+    "title": "Concurrent File Downloader",
+    "slug": "custom-concurrent-downloads",
+    "difficulty": "Medium",
+    "content_text": "Concurrent tasks\n\nDesign and implement a simple Python script that:\n\n1. Opens a text file with an arbitrary number of URLs, one per line:\n\n    www.domain1.com/doc1.pdf\n    www.domain1.com/doc2.pdf\n    www.domain2.com/doc1.html\n    www.domain3.com/doc1.txt\n    ...\n\n2. Downloads all of those files concurrently.\n\nDiscussion points to be ready for: thread pool vs asyncio (and why), bounding concurrency, filename collisions across domains, streaming large files, per-task error isolation, timeouts/retries, and politeness (rate limiting per host).\n\n(Press s for the editorial + reference.)",
+    "example_testcases": "",
+    "python_snippet": "# Read URLs (one per line), download concurrently. I/O-bound work ->\n# a bounded ThreadPoolExecutor + requests is the idiomatic choice.\nimport concurrent.futures as cf\nfrom pathlib import Path\n\n\ndef download_all(url_file, out_dir='downloads', max_workers=8):\n    pass\n",
+    "topic_tags": [
+      "Custom",
+      "Python",
+      "Concurrency",
+      "Systems Design"
+    ],
+    "hints": [
+      "Downloading is I/O-bound: threads (or async) help, processes don't.",
+      "Bound concurrency with a fixed-size pool — don't spawn one thread per URL.",
+      "Two URLs can share a basename (doc1.pdf); derive output names from the full URL.",
+      "Stream to disk in chunks; isolate failures per URL so one bad link doesn't kill the batch."
+    ],
+    "has_solution": true
+  },
+  "custom-csv-data-wrangling": {
+    "id": 9004,
+    "title": "Data Wrangling: Sales CSV",
+    "slug": "custom-csv-data-wrangling",
+    "difficulty": "Easy",
+    "content_text": "Data Wrangling — Basic Manipulations\n\nYou are given a CSV such as the following:\n\n    Date,Product,Region,Sales\n    2023-01-01,Widget A,North,100\n    2023-01-01,Widget A,East,300\n    2023-01-01,Widget B,South,150\n    2023-01-02,Widget A,North,200\n    2023-01-02,Widget B,South,250\n    2023-01-03,Widget A,North,50\n    2023-01-03,Widget B,South,75\n\nWrite a Python script, using any library you want (or basic Python), to:\n\n1. Calculate the total sales for each product.\n2. Filter the data to consider only sales in a certain region.\n\nDiscussion:\n3. How would you handle missing data if some rows had NaN in the Sales column?\n\n(Press s for the editorial + reference.)",
+    "example_testcases": "",
+    "python_snippet": "# Total sales per product, plus filter by region. pandas or pure-Python.\nimport csv\nfrom collections import defaultdict\n\n\ndef totals_per_product(path):\n    pass\n\n\ndef filter_region(path, region):\n    pass\n",
+    "topic_tags": [
+      "Custom",
+      "Python",
+      "Data Wrangling",
+      "pandas"
+    ],
+    "hints": [
+      "Group-by-and-aggregate: df.groupby('Product')['Sales'].sum().",
+      "Filter with a boolean mask: df[df['Region'] == 'North'].",
+      "NaN handling has no single right answer — drop, fill 0, or impute; tie the choice to how the number is used and report how much was missing."
+    ],
+    "has_solution": true
   }
 }

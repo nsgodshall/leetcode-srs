@@ -1,0 +1,95 @@
+Data wrangling: basic manipulations over a sales CSV.
+
+You are given a CSV such as:
+
+    Date,Product,Region,Sales
+    2023-01-01,Widget A,North,100
+    2023-01-01,Widget A,East,300
+    2023-01-01,Widget B,South,150
+    2023-01-02,Widget A,North,200
+    2023-01-02,Widget B,South,250
+    2023-01-03,Widget A,North,50
+    2023-01-03,Widget B,South,75
+
+Tasks
+-----
+1. Calculate the total sales for each product.
+2. Filter the data to consider only sales in a certain region.
+3. (Discussion) How would you handle missing data if some rows had NaN in
+   the Sales column?
+
+Approach
+--------
+This is a group-by-and-aggregate plus a filter. pandas is the natural tool,
+but you should be able to do it in pure Python too (no third-party deps) —
+interviewers often ask for both, or ask you to do it without pandas.
+
+pandas
+------
+```python
+import pandas as pd
+
+df = pd.read_csv("sales.csv")
+
+# 1) Total sales per product:
+totals = df.groupby("Product")["Sales"].sum()
+#   Widget A    650
+#   Widget B    475
+
+# 2) Filter to a region (e.g. North):
+north = df[df["Region"] == "North"]
+
+# Combine: total per product within a region
+north_totals = north.groupby("Product")["Sales"].sum()
+```
+
+Pure Python (no pandas)
+-----------------------
+```python
+import csv
+from collections import defaultdict
+
+totals = defaultdict(float)
+with open("sales.csv", newline="") as f:
+    for row in csv.DictReader(f):
+        sales = row["Sales"].strip()
+        if not sales:            # skip / handle missing
+            continue
+        totals[row["Product"]] += float(sales)
+
+def in_region(path, region):
+    with open(path, newline="") as f:
+        return [r for r in csv.DictReader(f) if r["Region"] == region]
+```
+
+Discussion: handling NaN / missing Sales
+----------------------------------------
+There is no single right answer — the point is to articulate the trade-offs
+and tie the choice to what the number will be used for.
+
+- Drop the rows (`df.dropna(subset=["Sales"])`): simplest, safe when missing
+  rows are few and random. Risk: biases totals downward and discards the
+  Date/Product/Region info on those rows.
+- Fill with 0 (`df["Sales"].fillna(0)`): correct only if "missing" really
+  means "no sales". Wrong if it means "not recorded", because it understates
+  reality and drags averages down.
+- Impute: fill with the mean/median (overall, or per product/region group),
+  or forward-fill a time series. Better central estimate, but invents data
+  and can hide problems.
+- Flag and investigate: missingness is often a data-quality signal (a broken
+  ETL job, one region not reporting). Quantify it
+  (`df["Sales"].isna().mean()`) before deciding.
+
+Rules of thumb to say out loud:
+- For a *sum*, dropping vs filling 0 give the same total only when the true
+  values are 0 — otherwise they differ, so state your assumption.
+- For an *average*, dropping (NaN-aware mean) and filling-0 give very
+  different answers; pandas' `.mean()` already skips NaN, which is usually
+  what you want.
+- Always report how much data was missing alongside the result.
+- Watch the dtype: a NaN in an int column forces the column to float in
+  pandas; numbers read as strings need `pd.to_numeric(..., errors="coerce")`
+  to turn junk into NaN you can then handle deliberately.
+
+The reference file shows a runnable version against an in-memory CSV so you
+can see the exact totals.
