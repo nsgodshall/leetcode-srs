@@ -12,12 +12,14 @@ Usage:
 import asyncio
 import sys
 from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.problem_list import LC_TO_NC_SLUG, python_slugs
+from src.problem_list import LC_TO_NC_SLUG, python_slugs, custom_slugs
 from src import fetch as F
 from src import data as D
+from src import data as D
+from src import fetch as F
+from src.problem_list import LC_TO_NC_SLUG, all_slugs, custom_slugs
 
 _HTTP_CONCURRENCY = 8
 _PROC_CONCURRENCY = 5
@@ -94,7 +96,9 @@ def fetch_editorials() -> None:
         from playwright.sync_api import sync_playwright
     except ImportError:
         print("  ERROR: playwright not installed.")
-        print("  Run: uv pip install playwright && .venv/bin/playwright install chromium")
+        print(
+            "  Run: uv pip install playwright && .venv/bin/playwright install chromium"
+        )
         return
 
     slugs = python_slugs()
@@ -102,7 +106,9 @@ def fetch_editorials() -> None:
     cached = len(slugs) - len(to_fetch)
     saved = 0
 
-    print(f"\nScraping NeetCode editorials ({cached} cached, {len(to_fetch)} remaining)...")
+    print(
+        f"\nScraping NeetCode editorials ({cached} cached, {len(to_fetch)} remaining)..."
+    )
     print("(reusing one browser — ~6-8s per problem, ~16 min for all 150)\n")
 
     if not to_fetch:
@@ -187,18 +193,25 @@ async def download_all_videos() -> None:
         vpath = D.video_path(slug)
         out_tmpl = str(vpath).replace(".mp4", ".%(ext)s")
         cmd = [
-            "yt-dlp", f"ytsearch1:NeetCode {title}",
-            "-f", "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "--merge-output-format", "mp4",
-            "-o", out_tmpl,
-            "--no-playlist", "-q",
+            "yt-dlp",
+            f"ytsearch1:NeetCode {title}",
+            "-f",
+            "bestvideo[height<=480]+bestaudio/best[height<=480]",
+            "--merge-output-format",
+            "mp4",
+            "-o",
+            out_tmpl,
+            "--no-playlist",
+            "-q",
         ]
         async with sem:
             try:
                 proc = await asyncio.create_subprocess_exec(*cmd)
                 await asyncio.wait_for(proc.wait(), timeout=120)
                 done += 1
-                print(f"  [{done}/{total}] {'✓' if proc.returncode == 0 else '✗'} {title}")
+                print(
+                    f"  [{done}/{total}] {'✓' if proc.returncode == 0 else '✗'} {title}"
+                )
             except asyncio.TimeoutError:
                 proc.kill()
                 done += 1
@@ -208,6 +221,37 @@ async def download_all_videos() -> None:
                 sys.exit(1)
 
     await asyncio.gather(*[download_one(s) for s in to_fetch])
+
+
+def seed_custom() -> None:
+    """Copy custom interview-prep problems, editorials, and solutions from
+    data-back/ into the live data/ directory. Idempotent — safe to re-run."""
+    import json
+    import shutil
+
+    back = Path(__file__).parent / "data-back"
+    back_problems = back / "problems.json"
+    if not back_problems.exists():
+        return
+
+    back_data = json.loads(back_problems.read_text(encoding="utf-8"))
+    customs = {s: back_data[s] for s in custom_slugs() if s in back_data}
+    if not customs:
+        return
+
+    live = D.load_problems()
+    live.update(customs)
+    D.save_problems(live)
+
+    for slug in customs:
+        for sub, ext in ("editorials", "txt"), ("solutions", "py"):
+            src = back / sub / f"{slug}.{ext}"
+            dst = Path(__file__).parent / "data" / sub / f"{slug}.{ext}"
+            if src.exists() and not dst.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+
+    print(f"Seeded {len(customs)} custom questions from data-back/")
 
 
 async def main() -> None:
@@ -235,6 +279,8 @@ async def main() -> None:
 
     if do_videos:
         await download_all_videos()
+
+    seed_custom()
 
     print("\nSetup complete!")
 
