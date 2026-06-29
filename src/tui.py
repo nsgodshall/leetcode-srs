@@ -191,10 +191,14 @@ class ListScreen(Screen):
         Binding("x", "srs_screen", "SRS"),
         Binding("d", "download_video", "Download"),
         Binding("escape", "clear_filters", "Clear filters"),
+        Binding("ctrl+d", "scroll_half_down", show=False),
+        Binding("ctrl+u", "scroll_half_up", show=False),
+        Binding("G", "scroll_bottom", show=False),
     ]
 
     _filter_text: reactive[str] = reactive("")
     _filter_topic: reactive[str | None] = reactive(None)
+    _g_pending: bool = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -334,6 +338,27 @@ class ListScreen(Screen):
         self._filter_text = ""
         self._filter_topic = None
         await self._refresh_list()
+
+    def action_scroll_half_down(self) -> None:
+        self.query_one("#problem-list", ListView).scroll_page_down()
+
+    def action_scroll_half_up(self) -> None:
+        self.query_one("#problem-list", ListView).scroll_page_up()
+
+    def action_scroll_bottom(self) -> None:
+        self.query_one("#problem-list", ListView).scroll_end(animate=False)
+
+    def on_key(self, event: Any) -> None:
+        if event.key == "g":
+            if self._g_pending:
+                self.query_one("#problem-list", ListView).scroll_home(animate=False)
+                self._g_pending = False
+                event.stop()
+            else:
+                self._g_pending = True
+                event.stop()
+        else:
+            self._g_pending = False
 
     def action_srs_screen(self) -> None:
         self.app.push_screen(SRSScreen())
