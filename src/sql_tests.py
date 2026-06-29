@@ -71,6 +71,161 @@ INSERT INTO Person (id, email) VALUES
     (3, 'a@b.com');
 """
 
+# Second dataset for Combine Two Tables: every person has an address (exercises
+# the matched path, complementing the unmatched/NULL case above).
+_COMBINE_TWO_TABLES_SCHEMA_2 = """
+CREATE TABLE Person (
+    personId  INTEGER PRIMARY KEY,
+    lastName  TEXT,
+    firstName TEXT
+);
+CREATE TABLE Address (
+    addressId INTEGER PRIMARY KEY,
+    personId  INTEGER,
+    city      TEXT,
+    state     TEXT
+);
+INSERT INTO Person (personId, lastName, firstName) VALUES
+    (1, 'Smith', 'Carol'),
+    (2, 'Jones', 'David');
+INSERT INTO Address (addressId, personId, city, state) VALUES
+    (1, 1, 'Austin', 'Texas'),
+    (2, 2, 'Reno', 'Nevada');
+"""
+
+# Second dataset for Duplicate Emails: no duplicates → empty result.
+_DUPLICATE_EMAILS_SCHEMA_2 = """
+CREATE TABLE Person (id INTEGER PRIMARY KEY, email TEXT);
+INSERT INTO Person (id, email) VALUES
+    (1, 'x@y.com'),
+    (2, 'z@y.com');
+"""
+
+# Third dataset for Duplicate Emails: two distinct duplicated addresses.
+_DUPLICATE_EMAILS_SCHEMA_3 = """
+CREATE TABLE Person (id INTEGER PRIMARY KEY, email TEXT);
+INSERT INTO Person (id, email) VALUES
+    (1, 'a@b.com'),
+    (2, 'a@b.com'),
+    (3, 'c@d.com'),
+    (4, 'c@d.com'),
+    (5, 'e@f.com');
+"""
+
+# ── 181. Employees Earning More Than Their Managers ────────────────────────
+
+_EMP_MANAGERS_SCHEMA = """
+CREATE TABLE Employee (
+    id        INTEGER PRIMARY KEY,
+    name      TEXT,
+    salary    INTEGER,
+    managerId INTEGER
+);
+INSERT INTO Employee (id, name, salary, managerId) VALUES
+    (1, 'Joe',   70000, 3),
+    (2, 'Henry', 80000, 4),
+    (3, 'Sam',   60000, NULL),
+    (4, 'Max',   90000, NULL);
+"""
+
+# ── 183. Customers Who Never Order ─────────────────────────────────────────
+
+_CUSTOMERS_NEVER_ORDER_SCHEMA = """
+CREATE TABLE Customers (id INTEGER PRIMARY KEY, name TEXT);
+CREATE TABLE Orders (id INTEGER PRIMARY KEY, customerId INTEGER);
+INSERT INTO Customers (id, name) VALUES
+    (1, 'Joe'),
+    (2, 'Henry'),
+    (3, 'Sam'),
+    (4, 'Max');
+INSERT INTO Orders (id, customerId) VALUES
+    (1, 3),
+    (2, 1);
+"""
+
+# ── 584. Find Customer Referee ─────────────────────────────────────────────
+
+_CUSTOMER_REFEREE_SCHEMA = """
+CREATE TABLE Customer (id INTEGER PRIMARY KEY, name TEXT, referee_id INTEGER);
+INSERT INTO Customer (id, name, referee_id) VALUES
+    (1, 'Will', NULL),
+    (2, 'Jane', NULL),
+    (3, 'Alex', 2),
+    (4, 'Bill', NULL),
+    (5, 'Zack', 1),
+    (6, 'Mark', 2);
+"""
+
+# ── 595. Big Countries ─────────────────────────────────────────────────────
+
+_BIG_COUNTRIES_SCHEMA = """
+CREATE TABLE World (
+    name       TEXT PRIMARY KEY,
+    continent  TEXT,
+    area       INTEGER,
+    population  INTEGER,
+    gdp        INTEGER
+);
+INSERT INTO World (name, continent, area, population, gdp) VALUES
+    ('Afghanistan', 'Asia',   652230,  25500100, 20343000000),
+    ('Albania',     'Europe', 28748,   2831741,  12960000000),
+    ('Algeria',     'Africa', 2381741, 37100000, 188681000000),
+    ('Andorra',     'Europe', 468,     78115,    3712000000),
+    ('Angola',      'Africa', 1246700, 20609294, 100990000000);
+"""
+
+# ── 596. Classes More Than 5 Students ──────────────────────────────────────
+
+_CLASSES_5_SCHEMA = """
+CREATE TABLE Courses (student TEXT, class TEXT);
+INSERT INTO Courses (student, class) VALUES
+    ('A', 'Math'),
+    ('B', 'English'),
+    ('C', 'Math'),
+    ('D', 'Biology'),
+    ('E', 'Math'),
+    ('F', 'Computer'),
+    ('G', 'Math'),
+    ('H', 'Math'),
+    ('I', 'Math');
+"""
+
+# ── 197. Rising Temperature ────────────────────────────────────────────────
+# recordDate is stored as TEXT 'YYYY-MM-DD'. The grader runs SQLite, so date
+# math uses SQLite functions (DATE(d,'+1 day')) rather than MySQL's DATEDIFF.
+
+_RISING_TEMP_SCHEMA = """
+CREATE TABLE Weather (
+    id          INTEGER PRIMARY KEY,
+    recordDate  TEXT,
+    temperature INTEGER
+);
+INSERT INTO Weather (id, recordDate, temperature) VALUES
+    (1, '2015-01-01', 10),
+    (2, '2015-01-02', 25),
+    (3, '2015-01-03', 20),
+    (4, '2015-01-04', 30);
+"""
+
+# ── 1148. Article Views I ──────────────────────────────────────────────────
+
+_ARTICLE_VIEWS_SCHEMA = """
+CREATE TABLE Views (
+    article_id INTEGER,
+    author_id  INTEGER,
+    viewer_id  INTEGER,
+    view_date  TEXT
+);
+INSERT INTO Views (article_id, author_id, viewer_id, view_date) VALUES
+    (1, 3, 5, '2019-08-01'),
+    (1, 3, 6, '2019-08-02'),
+    (2, 7, 7, '2019-08-01'),
+    (2, 7, 6, '2019-08-02'),
+    (4, 7, 1, '2019-07-22'),
+    (3, 4, 4, '2019-07-21'),
+    (3, 4, 4, '2019-07-21');
+"""
+
 
 # All SQL editorials are AI-generated (see banner). They are written for this
 # offline pilot because there is no scraped NeetCode editorial for SQL problems.
@@ -193,6 +348,197 @@ Readable but typically slower than GROUP BY on large tables.
 Complexity: O(n) with a hash-based grouping.
 """
 
+_EMP_MANAGERS_EDITORIAL = _AI_BANNER + """\
+Goal: list employees who earn strictly more than their own manager.
+
+Approach — self-join
+A manager is just another row in the same Employee table. Join the table to
+itself: alias e for the employee and m for their manager, matched on
+e.managerId = m.id. Then keep rows where the employee out-earns the manager.
+
+```sql
+SELECT e.name AS Employee
+FROM Employee e
+JOIN Employee m ON e.managerId = m.id
+WHERE e.salary > m.salary;
+```
+
+Why it works
+- The self-join pairs each employee with their manager's row.
+- An INNER JOIN is correct here: employees with no manager (managerId IS NULL)
+  can't out-earn a manager and should be excluded — the join drops them
+  automatically.
+
+Output column must be aliased Employee.
+
+Complexity: O(n) with an index on id; O(n²) for a naive nested loop.
+"""
+
+_CUSTOMERS_NEVER_ORDER_EDITORIAL = _AI_BANNER + """\
+Goal: find customers who have never placed an order.
+
+Approach — anti-join with NOT IN
+Collect the customerIds that appear in Orders, then select customers whose id is
+not among them.
+
+```sql
+SELECT name AS Customers
+FROM Customers
+WHERE id NOT IN (SELECT customerId FROM Orders);
+```
+
+Why it works
+- The subquery is the set of customers who *did* order.
+- NOT IN keeps everyone outside that set.
+
+A NULL caveat worth knowing
+NOT IN behaves surprisingly if the subquery can return NULL: `x NOT IN (1, NULL)`
+is never true. Orders.customerId has no NULLs here so it's safe, but the robust
+alternatives avoid the trap:
+
+```sql
+SELECT c.name AS Customers
+FROM Customers c
+LEFT JOIN Orders o ON c.id = o.customerId
+WHERE o.customerId IS NULL;
+```
+
+The LEFT JOIN keeps every customer; unmatched ones have NULL order columns, which
+the WHERE then isolates.
+
+Complexity: O(n + m).
+"""
+
+_CUSTOMER_REFEREE_EDITORIAL = _AI_BANNER + """\
+Goal: report customers who were NOT referred by the customer with id = 2.
+
+The catch is NULL. Most customers have referee_id = NULL (no referrer), and in
+SQL any comparison with NULL (including `referee_id != 2`) yields UNKNOWN, not
+true — so those rows would be wrongly dropped.
+
+Approach — handle NULL explicitly
+
+```sql
+SELECT name
+FROM Customer
+WHERE referee_id IS NULL OR referee_id != 2;
+```
+
+Why it works
+- `referee_id != 2` catches customers referred by someone other than 2.
+- `referee_id IS NULL` separately catches customers with no referrer, which the
+  inequality silently misses.
+
+Key lesson: three-valued logic
+NULL means "unknown," so `NULL != 2` is UNKNOWN and filtered out by WHERE. Any
+time a nullable column appears in a negative condition, add an explicit IS NULL
+branch (or use COALESCE).
+
+Complexity: O(n), a single table scan.
+"""
+
+_BIG_COUNTRIES_EDITORIAL = _AI_BANNER + """\
+Goal: report the name, population, and area of every "big" country — one whose
+area is at least 3,000,000 OR whose population is at least 25,000,000.
+
+Approach — a straightforward OR filter
+
+```sql
+SELECT name, population, area
+FROM World
+WHERE area >= 3000000 OR population >= 25000000;
+```
+
+Why it works
+- The two size criteria are independent, so they're joined with OR: a country
+  qualifies if it meets either one.
+- Select the columns in the requested order: name, population, area.
+
+Watch the column order
+The expected output is name, population, area — not the table's natural order
+(area before population). List them explicitly as required.
+
+Complexity: O(n), a single scan.
+"""
+
+_CLASSES_5_EDITORIAL = _AI_BANNER + """\
+Goal: list every class that has 5 or more students.
+
+Approach — GROUP BY + HAVING
+
+```sql
+SELECT class
+FROM Courses
+GROUP BY class
+HAVING COUNT(student) >= 5;
+```
+
+Why it works
+- GROUP BY class makes one group per class.
+- COUNT(student) is that class's enrollment.
+- HAVING filters on the aggregate; WHERE can't, because it runs before grouping.
+
+Note: if a student could enroll in the same class twice you'd use
+COUNT(DISTINCT student); here each (student, class) pairing is unique.
+
+Complexity: O(n) with hash grouping.
+"""
+
+_RISING_TEMP_EDITORIAL = _AI_BANNER + """\
+Goal: find the ids of days that were warmer than the immediately previous day.
+
+This grader runs on SQLite, so use SQLite date functions, not MySQL's DATEDIFF.
+
+Approach — self-join on consecutive dates
+Pair each day (w1) with the day before it (w2) by matching w1.recordDate to
+w2.recordDate + 1 day, then keep pairs where today is warmer.
+
+```sql
+SELECT w1.id
+FROM Weather w1
+JOIN Weather w2 ON w1.recordDate = DATE(w2.recordDate, '+1 day')
+WHERE w1.temperature > w2.temperature;
+```
+
+Why it works
+- DATE(w2.recordDate, '+1 day') yields the calendar day after w2 as text
+  'YYYY-MM-DD', which compares directly to w1.recordDate.
+- Anchoring on the actual date (not id) is essential — ids aren't guaranteed to
+  be in date order, and dates can have gaps.
+
+MySQL vs SQLite
+On LeetCode you'd write `DATEDIFF(w1.recordDate, w2.recordDate) = 1`. SQLite has
+no DATEDIFF, hence the DATE(..., '+1 day') form here.
+
+Complexity: O(n) with an index on recordDate.
+"""
+
+_ARTICLE_VIEWS_EDITORIAL = _AI_BANNER + """\
+Goal: find all authors who viewed at least one of their own articles, returned
+as a column `id`, sorted ascending and de-duplicated.
+
+Approach — filter where author equals viewer
+
+```sql
+SELECT DISTINCT author_id AS id
+FROM Views
+WHERE author_id = viewer_id
+ORDER BY id;
+```
+
+Why it works
+- author_id = viewer_id means the viewer is the author — a self-view.
+- DISTINCT collapses an author who self-viewed multiple times to one row.
+- ORDER BY id is required: this problem specifies the result order, so it must be
+  sorted (unlike the others, which allow any order).
+
+Watch the alias and the sort
+The output column must be named id, and the rows must be ascending — both are
+graded.
+
+Complexity: O(n log n) due to the sort.
+"""
+
 
 SQL_PROBLEMS: dict[str, dict] = {
     "combine-two-tables": {
@@ -289,6 +635,220 @@ SQL_PROBLEMS: dict[str, dict] = {
         ),
         "editorial": _DUPLICATE_EMAILS_EDITORIAL,
     },
+    "employees-earning-more-than-their-managers": {
+        "id": 181,
+        "title": "Employees Earning More Than Their Managers",
+        "slug": "employees-earning-more-than-their-managers",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Employee\n"
+            "  id (int, primary key), name (varchar), salary (int), managerId (int)\n\n"
+            "Write a solution to find the employees who earn more than their "
+            "managers.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output column: Employee"
+        ),
+        "sql_schema": _EMP_MANAGERS_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "A manager is just another row in the same table — join Employee to "
+            "itself on e.managerId = m.id.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT e.name AS Employee\n"
+            "FROM Employee e\n"
+            "JOIN Employee m ON e.managerId = m.id\n"
+            "WHERE e.salary > m.salary;"
+        ),
+        "editorial": _EMP_MANAGERS_EDITORIAL,
+    },
+    "customers-who-never-order": {
+        "id": 183,
+        "title": "Customers Who Never Order",
+        "slug": "customers-who-never-order",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Customers\n"
+            "  id (int, primary key), name (varchar)\n\n"
+            "Table: Orders\n"
+            "  id (int, primary key), customerId (int)\n\n"
+            "Write a solution to find all customers who never order anything.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output column: Customers"
+        ),
+        "sql_schema": _CUSTOMERS_NEVER_ORDER_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "Collect the customerIds that appear in Orders, then keep customers "
+            "whose id is NOT IN that set (or use a LEFT JOIN ... IS NULL).",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT name AS Customers\n"
+            "FROM Customers\n"
+            "WHERE id NOT IN (SELECT customerId FROM Orders);"
+        ),
+        "editorial": _CUSTOMERS_NEVER_ORDER_EDITORIAL,
+    },
+    "find-customer-referee": {
+        "id": 584,
+        "title": "Find Customer Referee",
+        "slug": "find-customer-referee",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Customer\n"
+            "  id (int, primary key), name (varchar), referee_id (int, nullable)\n\n"
+            "Find the names of the customers that are NOT referred by the customer "
+            "with id = 2.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output column: name"
+        ),
+        "sql_schema": _CUSTOMER_REFEREE_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "referee_id is nullable. `referee_id != 2` is UNKNOWN for NULLs, so add "
+            "an explicit `OR referee_id IS NULL`.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT name\n"
+            "FROM Customer\n"
+            "WHERE referee_id IS NULL OR referee_id != 2;"
+        ),
+        "editorial": _CUSTOMER_REFEREE_EDITORIAL,
+    },
+    "big-countries": {
+        "id": 595,
+        "title": "Big Countries",
+        "slug": "big-countries",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: World\n"
+            "  name (varchar, primary key), continent (varchar), area (int), "
+            "population (int), gdp (bigint)\n\n"
+            "A country is big if it has an area of at least 3,000,000 km² OR a "
+            "population of at least 25,000,000.\n\n"
+            "Write a solution to report the name, population, and area of the big "
+            "countries.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output columns: name, population, area"
+        ),
+        "sql_schema": _BIG_COUNTRIES_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "The two size criteria are independent — combine them with OR.",
+            "Mind the requested column order: name, population, area.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT name, population, area\n"
+            "FROM World\n"
+            "WHERE area >= 3000000 OR population >= 25000000;"
+        ),
+        "editorial": _BIG_COUNTRIES_EDITORIAL,
+    },
+    "classes-more-than-5-students": {
+        "id": 596,
+        "title": "Classes More Than 5 Students",
+        "slug": "classes-more-than-5-students",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Courses\n"
+            "  student (varchar), class (varchar)  — (student, class) is unique\n\n"
+            "Write a solution to find all the classes that have at least five "
+            "students.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output column: class"
+        ),
+        "sql_schema": _CLASSES_5_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "GROUP BY class, then HAVING COUNT(student) >= 5.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT class\n"
+            "FROM Courses\n"
+            "GROUP BY class\n"
+            "HAVING COUNT(student) >= 5;"
+        ),
+        "editorial": _CLASSES_5_EDITORIAL,
+    },
+    "rising-temperature": {
+        "id": 197,
+        "title": "Rising Temperature",
+        "slug": "rising-temperature",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Weather\n"
+            "  id (int, primary key), recordDate (date), temperature (int)\n\n"
+            "Write a solution to find all dates' id with higher temperature compared "
+            "to the previous day (yesterday).\n\n"
+            "NOTE: this runs on SQLite — use SQLite date functions such as "
+            "DATE(recordDate, '+1 day'), not MySQL's DATEDIFF.\n\n"
+            "Return the result table in **any order**.\n\n"
+            "Output column: id"
+        ),
+        "sql_schema": _RISING_TEMP_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "Self-join Weather to itself, pairing each day with the day before via "
+            "w1.recordDate = DATE(w2.recordDate, '+1 day').",
+            "Anchor on the date, not the id — ids may not follow date order.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT w1.id\n"
+            "FROM Weather w1\n"
+            "JOIN Weather w2 ON w1.recordDate = DATE(w2.recordDate, '+1 day')\n"
+            "WHERE w1.temperature > w2.temperature;"
+        ),
+        "editorial": _RISING_TEMP_EDITORIAL,
+    },
+    "article-views-i": {
+        "id": 1148,
+        "title": "Article Views I",
+        "slug": "article-views-i",
+        "difficulty": "Easy",
+        "lang": "sql",
+        "content_text": (
+            "Table: Views\n"
+            "  article_id (int), author_id (int), viewer_id (int), view_date (date)\n\n"
+            "Write a solution to find all the authors that viewed at least one of "
+            "their own articles.\n\n"
+            "Return the result table sorted by id in **ascending order**.\n\n"
+            "Output column: id"
+        ),
+        "sql_schema": _ARTICLE_VIEWS_SCHEMA.strip(),
+        "sql_snippet": "-- Write your SQL query statement below",
+        "topic_tags": ["Database"],
+        "hints": [
+            "A self-view is a row where author_id = viewer_id.",
+            "De-duplicate with DISTINCT and remember ORDER BY id — this one is "
+            "order-sensitive.",
+        ],
+        "has_solution": True,
+        "reference": (
+            "SELECT DISTINCT author_id AS id\n"
+            "FROM Views\n"
+            "WHERE author_id = viewer_id\n"
+            "ORDER BY id;"
+        ),
+        "editorial": _ARTICLE_VIEWS_EDITORIAL,
+    },
 }
 
 
@@ -300,6 +860,15 @@ SQL_TESTS: dict[str, list[dict]] = {
             "expected_rows": [
                 ["Allen", "Wang", None, None],
                 ["Bob", "Alice", "New York City", "New York"],
+            ],
+            "ordered": False,
+        },
+        {
+            "schema": _COMBINE_TWO_TABLES_SCHEMA_2,
+            "expected_cols": ["firstName", "lastName", "city", "state"],
+            "expected_rows": [
+                ["Carol", "Smith", "Austin", "Texas"],
+                ["David", "Jones", "Reno", "Nevada"],
             ],
             "ordered": False,
         },
@@ -324,6 +893,79 @@ SQL_TESTS: dict[str, list[dict]] = {
             "expected_cols": ["Email"],
             "expected_rows": [["a@b.com"]],
             "ordered": False,
+        },
+        {
+            # No duplicates → empty result set.
+            "schema": _DUPLICATE_EMAILS_SCHEMA_2,
+            "expected_cols": ["Email"],
+            "expected_rows": [],
+            "ordered": False,
+        },
+        {
+            # Two distinct duplicated addresses.
+            "schema": _DUPLICATE_EMAILS_SCHEMA_3,
+            "expected_cols": ["Email"],
+            "expected_rows": [["a@b.com"], ["c@d.com"]],
+            "ordered": False,
+        },
+    ],
+    "employees-earning-more-than-their-managers": [
+        {
+            "schema": _EMP_MANAGERS_SCHEMA,
+            "expected_cols": ["Employee"],
+            "expected_rows": [["Joe"]],
+            "ordered": False,
+        },
+    ],
+    "customers-who-never-order": [
+        {
+            "schema": _CUSTOMERS_NEVER_ORDER_SCHEMA,
+            "expected_cols": ["Customers"],
+            "expected_rows": [["Henry"], ["Max"]],
+            "ordered": False,
+        },
+    ],
+    "find-customer-referee": [
+        {
+            "schema": _CUSTOMER_REFEREE_SCHEMA,
+            "expected_cols": ["name"],
+            "expected_rows": [["Will"], ["Jane"], ["Bill"], ["Zack"]],
+            "ordered": False,
+        },
+    ],
+    "big-countries": [
+        {
+            "schema": _BIG_COUNTRIES_SCHEMA,
+            "expected_cols": ["name", "population", "area"],
+            "expected_rows": [
+                ["Afghanistan", 25500100, 652230],
+                ["Algeria", 37100000, 2381741],
+            ],
+            "ordered": False,
+        },
+    ],
+    "classes-more-than-5-students": [
+        {
+            "schema": _CLASSES_5_SCHEMA,
+            "expected_cols": ["class"],
+            "expected_rows": [["Math"]],
+            "ordered": False,
+        },
+    ],
+    "rising-temperature": [
+        {
+            "schema": _RISING_TEMP_SCHEMA,
+            "expected_cols": ["id"],
+            "expected_rows": [[2], [4]],
+            "ordered": False,
+        },
+    ],
+    "article-views-i": [
+        {
+            "schema": _ARTICLE_VIEWS_SCHEMA,
+            "expected_cols": ["id"],
+            "expected_rows": [[4], [7]],
+            "ordered": True,
         },
     ],
 }

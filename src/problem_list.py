@@ -192,7 +192,14 @@ TOPICS: dict[str, list[str]] = {
     "SQL": [
         "combine-two-tables",
         "second-highest-salary",
+        "employees-earning-more-than-their-managers",
+        "customers-who-never-order",
         "duplicate-emails",
+        "find-customer-referee",
+        "big-countries",
+        "classes-more-than-5-students",
+        "rising-temperature",
+        "article-views-i",
     ],
 }
 
@@ -203,7 +210,14 @@ SQL_SLUGS: set[str] = set(TOPICS["SQL"])
 SLUG_IDS: dict[str, int] = {
     "combine-two-tables": 175,
     "second-highest-salary": 176,
+    "employees-earning-more-than-their-managers": 181,
+    "customers-who-never-order": 183,
     "duplicate-emails": 182,
+    "find-customer-referee": 584,
+    "big-countries": 595,
+    "classes-more-than-5-students": 596,
+    "rising-temperature": 197,
+    "article-views-i": 1148,
     "contains-duplicate": 217,
     "valid-anagram": 242,
     "two-sum": 1,
