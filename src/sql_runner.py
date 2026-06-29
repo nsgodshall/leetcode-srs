@@ -26,15 +26,19 @@ def _short(v: Any, n: int = 120) -> str:
 
 
 def _strip_query(code: str) -> str:
-    """Return the query with the trailing ';' removed (sqlite3 executes one
-    statement at a time; a trailing semicolon is fine, but multiple statements
-    raise — so we keep only up to the first terminating semicolon)."""
-    code = code.strip()
-    # Drop everything after the first ';' that ends a statement so a stray second
-    # statement (or trailing comment) doesn't trip "execute only one statement".
-    if ";" in code:
-        code = code[: code.index(";") + 1]
-    return code
+    """Return just the user's query.
+
+    The .sql starter embeds the problem statement and schema as ``--`` comment
+    lines (which contain semicolons), so we must NOT naively cut at the first
+    ';'. Instead drop whole-line ``--`` comments and blank lines and keep the
+    rest verbatim. sqlite3 executes a single statement; a trailing ';' is fine,
+    and a genuine multi-statement query surfaces as a normal SQL error.
+    """
+    kept = [
+        line for line in code.splitlines()
+        if line.strip() and not line.lstrip().startswith("--")
+    ]
+    return "\n".join(kept).strip()
 
 
 def _run_one(case: dict, query: str) -> tuple[list[str], list[list]]:
@@ -83,8 +87,8 @@ def run_sql_tests(slug: str, user_code: str) -> str:
         return "No SQL tests for this problem."
 
     query = _strip_query(user_code)
-    if not query or query.lstrip().startswith("--") and "\n" not in query:
-        return "No query found. Press e to write a SQL query first."
+    if not query:
+        return "No query found. Write a SQL query below the comments, then press r."
 
     records: list[tuple[str, str, Any]] = []
     for i, case in enumerate(cases, 1):
